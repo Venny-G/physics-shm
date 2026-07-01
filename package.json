@@ -1,0 +1,20 @@
+{
+  "name": "shm-boundary-notebook",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal boundary-value simple harmonic motion simulator for learning ODE physics.",
+  "scripts": {
+    "start": "python3 server.py",
+    "check": "npm run check:python && npm run check:js",
+    "check:python": "python3 -m py_compile server.py physics.py simulations/registry.py simulations/day01_boundary_value/model.py",
+    "check:js": "node --check script.js"
+  },
+  "keywords": [
+    "physics",
+    "simple-harmonic-motion",
+    "differential-equations",
+    "boundary-value-problem",
+    "simulation"
+  ],
+  "license": "MIT"
+}
