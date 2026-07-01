@@ -63,7 +63,7 @@ function solveInBrowser(params) {
   const omega = Math.sqrt(spring / mass);
   const period = 2 * Math.PI / omega;
   const denominator = Math.sin(omega * targetTime);
-  let warning = 'Static page fallback: using the browser copy of the Day 1 solve.';
+  let warning = '';
   let v0 = 0;
   if (Math.abs(denominator) < 0.035) {
     warning = 'Near singular boundary time: target may be impossible or non-unique.';
