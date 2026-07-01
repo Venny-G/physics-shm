@@ -4,6 +4,16 @@ An interactive, note-like browser simulator for learning simple harmonic motion 
 
 The project is meant to grow one study day at a time. Each new topic should be added as a small simulation module, not mixed into the Day 1 code.
 
+## Web Version
+
+Open the notebook here:
+
+```text
+https://venny-g.github.io/physics-shm/
+```
+
+The web version uses the same Day 1 formula in a browser fallback so the simulation can run on GitHub Pages. The local version below uses Python for the physics solve.
+
 ## Run
 
 ```bash

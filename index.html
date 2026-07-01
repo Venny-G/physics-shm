@@ -3,32 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Harmonic Osciliators - Ven's Notes</title>
+    <title>Ven's Notes: Vibrations and Waves Simulation + Notes</title>
     <link rel="stylesheet" href="styles.css?v=3" />
   </head>
   <body>
     <main class="shell">
       <header class="mast">
-        <h1>Harmonic Osciliators - Ven's Notes</h1>
-      </header>
-
-      <section class="notebook-main">
+        <h1>Ven's Notes: Vibrations and Waves Simulation + Notes</h1>
         <p class="intro">
           I'm aspiring to build my own plasma physics simulations but I realized I can't code really slow and I rely on others' work too much. I thought challenging myself to code harmonic motion would be a good excercise by utilzing MIT OCW's course on <a href="https://ocw.mit.edu/courses/res-8-005-vibrations-and-waves-problem-solving-fall-2012/">Vibrations and Waves Problem Solving</a>. I think it'll help a lot with general fundamentals and speed, and I'll see whether I recommend doing this for training this by the end (which should be at day 10).
         </p>
+      </header>
 
+      <section class="notebook-main">
+        <h2>Harmonic Oscillators</h2>
         <nav class="day-tabs" aria-label="Study days">
-          <button class="active" type="button" data-sim="day01_boundary_value">Day 1: Lecture 1</button>
-          <button class="ghost" type="button" data-sim="day02_damping">Day 2: damping</button>
-          <button class="ghost" type="button" data-sim="day03_driven">Day 3: driven</button>
-          <button class="ghost" type="button" data-sim="day04_coupled">Day 4: coupled</button>
+          <button class="active" type="button" data-sim="day01_boundary_value">Lecture 1: SHM</button>
+          <button class="ghost" type="button" data-sim="day02_damping">Lecture 2: Dampening (Today)</button>
+          <button class="ghost" type="button" data-sim="day03_driven">Lecture 3: CS</button>
+          <button class="ghost" type="button" data-sim="day04_coupled">Lecture 4: CS</button>
         </nav>
 
         <section class="controls" aria-label="Simulation controls">
-          <div class="button-row">
-            <button id="reset" type="button">Reset</button>
-          </div>
-
           <section class="control-block compact-controls" id="boundaryControls">
             <h2>Boundary value solve: choose x(0), x(T), and T</h2>
             <label>Mass, m<input id="bMass" type="number" min="0.2" max="8" step="0.1" value="1" /></label>
@@ -45,9 +41,9 @@
               <button id="pausePlayback" type="button">Pause</button>
               <button id="slowPlayback" type="button">Slow</button>
               <button id="normalPlayback" class="active" type="button">Normal</button>
+              <button id="reset" type="button">Reset</button>
             </div>
           </section>
-
         </section>
 
         <div class="sim-wrap">

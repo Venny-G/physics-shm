@@ -52,6 +52,74 @@ const fetchSolve = async (params, signal) => {
   return { ok: res.ok, payload: json };
 };
 
+function solveInBrowser(params) {
+  const mass = Number(params.get('m') || 1);
+  const spring = Number(params.get('k') || 4);
+  const x0 = Number(params.get('x0') || 1);
+  const xT = Number(params.get('xT') || -1);
+  const targetTime = Number(params.get('T') || 1.2);
+  if (mass <= 0 || spring <= 0 || targetTime <= 0) throw new Error('m, k, and T must be positive.');
+
+  const omega = Math.sqrt(spring / mass);
+  const period = 2 * Math.PI / omega;
+  const denominator = Math.sin(omega * targetTime);
+  let warning = 'Static page fallback: using the browser copy of the Day 1 solve.';
+  let v0 = 0;
+  if (Math.abs(denominator) < 0.035) {
+    warning = 'Near singular boundary time: target may be impossible or non-unique.';
+  } else {
+    v0 = omega * (xT - x0 * Math.cos(omega * targetTime)) / denominator;
+  }
+
+  const amplitude = Math.hypot(x0, v0 / omega);
+  const phase = Math.atan2(-v0 / omega, x0);
+  const duration = Math.max(period * 2, targetTime * 1.25, 1);
+  const points = [];
+  for (let i = 0; i < 600; i++) {
+    const t = duration * i / 599;
+    const angle = omega * t + phase;
+    const x = amplitude * Math.cos(angle);
+    const v = -amplitude * omega * Math.sin(angle);
+    const a = -(omega ** 2) * x;
+    points.push({ t, x, v, a, force: -spring * x });
+  }
+
+  return {
+    input: { mass, spring, x0, xT, targetTime },
+    omega,
+    period,
+    v0,
+    amplitude,
+    phase,
+    duration,
+    warning,
+    points,
+    equationText: [
+      'Browser fallback solve:',
+      "m x'' = -k x",
+      `x'' + (${omega.toFixed(3)})^2 x = 0`,
+      '',
+      'Boundary values:',
+      `x(0) = ${x0.toFixed(3)}`,
+      `x(${targetTime.toFixed(3)}) = ${xT.toFixed(3)}`,
+      '',
+      'Solve missing initial velocity:',
+      'v0 = w0 * (xT - x0 cos(w0 T)) / sin(w0 T)',
+      `v0 = ${v0.toFixed(3)}`,
+      '',
+      'Convert to lecture-note form:',
+      'A = sqrt(x0^2 + (v0/w0)^2)',
+      'phi = atan2(-v0/w0, x0)',
+      `A = ${amplitude.toFixed(3)}`,
+      `phi = ${phase.toFixed(3)} rad`,
+      '',
+      'Position:',
+      'x(t) = A cos(w0 t + phi)',
+      `x(t) = ${amplitude.toFixed(3)} cos(${omega.toFixed(3)}t + ${phase.toFixed(3)})`,
+    ].join('\n'),
+  };
+}
+
 // debounce + AbortController
 function scheduleSolve(delay = 250) {
   clearTimeout(solveTimer);
@@ -60,7 +128,10 @@ function scheduleSolve(delay = 250) {
     currentAbort = new AbortController();
     const id = ++pendingId;
     const params = new URLSearchParams({ sim: ACTIVE_SIMULATION, m: inputNumber('mass'), k: inputNumber('spring'), x0: inputNumber('x0'), xT: inputNumber('xT'), T: inputNumber('targetTime') });
-    const { ok, payload } = await fetchSolve(params, currentAbort.signal).catch((err) => ({ ok: false, payload: { error: err?.name === 'AbortError' ? '' : SERVER_HELP } }));
+    const { ok, payload } = await fetchSolve(params, currentAbort.signal).catch((err) => {
+      if (err?.name === 'AbortError') return { ok: false, payload: { error: '' } };
+      return { ok: true, payload: solveInBrowser(params) };
+    });
     if (id !== pendingId) return;
     if (!ok) {
       solveError = payload?.error || 'Python solve failed.';
