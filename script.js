@@ -134,6 +134,15 @@ function scheduleSolve(delay = 250) {
     });
     if (id !== pendingId) return;
     if (!ok) {
+      if (!payload?.error) {
+        solution = solveInBrowser(params);
+        ui.equationText.textContent = solution.equationText || '';
+        ui.boundaryWarning.textContent = solution.warning || '';
+        simTime = 0;
+        lastFrame = performance.now();
+        currentAbort = null;
+        return;
+      }
       solveError = payload?.error || 'Python solve failed.';
       solution = null;
       ui.boundaryWarning.textContent = solveError;
