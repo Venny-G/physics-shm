@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from days.day01_boundary_value import model as day01_boundary_value
+from days.day02_damping import model as day02_damping
 
 
 MODULES = [
     day01_boundary_value,
+    day02_damping,
 ]
 
 SIMULATIONS = {module.SIMULATION["id"]: module for module in MODULES}

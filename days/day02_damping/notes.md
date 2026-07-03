@@ -24,5 +24,6 @@ omega0 = sqrt(k/m)
 
 ## Coding notes
 
-Keep this day separate from Day 1. The homepage can import this module through
-`days/registry.py` after the solver and controls exist.
+This day is registered through `days/registry.py`. The local server uses the
+Python solver, and the static GitHub Pages version uses the matching browser
+fallback in `script.js`.

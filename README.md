@@ -38,7 +38,7 @@ days/
 - `server.py`: local static server plus JSON API routes
 - `days/registry.py`: imports runnable day modules for the API
 - `days/day01_boundary_value/`: Day 1 notes, images, and working solver
-- `days/day02_damping/`: Day 2 notes and placeholder solver
+- `days/day02_damping/`: Day 2 notes and working damping solver
 - `.github/`: GitHub Pages and automation files
 
 ## Run Locally
@@ -72,7 +72,7 @@ node --check script.js
 ## Study Log
 
 - Day 1: boundary-value SHM. Given `x(0)`, `x(T)`, `T`, `m`, and `k`, solve the missing initial velocity and animate the motion.
-- Day 2: damping. Scaffolded as its own folder; not registered as a runnable simulation yet.
+- Day 2: damping. Given `x(0)`, `v(0)`, `m`, `b`, and `k`, classify the motion and animate underdamped, critical, or overdamped behavior.
 - Day 3: driven oscillator, planned.
 - Day 4: coupled oscillator, planned.
 

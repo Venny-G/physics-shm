@@ -37,6 +37,17 @@
             <p id="boundaryWarning" class="warning"></p>
           </section>
 
+          <section class="control-block compact-controls is-hidden" id="dampingControls">
+            <h2>Damped oscillator: choose x(0), v(0), and damping</h2>
+            <label>Mass, m<input id="dMass" type="number" min="0.2" max="8" step="0.1" value="1" /></label>
+            <label>Spring k<input id="dSpring" type="number" min="0.2" max="20" step="0.1" value="4" /></label>
+            <label>Damping b<input id="dDamping" type="number" min="0" max="8" step="0.05" value="0.8" /></label>
+            <label>x(0)<input id="dx0" type="number" min="-2.5" max="2.5" step="0.05" value="1" /></label>
+            <label>v(0)<input id="dv0" type="number" min="-6" max="6" step="0.05" value="0" /></label>
+            <label>Duration<input id="dDuration" type="number" min="1" max="20" step="0.25" value="8" /></label>
+            <p id="dampingWarning" class="warning"></p>
+          </section>
+
           <section class="control-block">
             <h2>Playback</h2>
             <div class="playback-row" role="group" aria-label="Playback speed">
@@ -57,7 +68,7 @@
           <pre id="equationText"></pre>
         </section>
 
-        <section class="lecture-sheet" aria-label="Day 1 notes">
+        <section class="lecture-sheet" data-note="day01_boundary_value" aria-label="Day 1 notes">
           <div class="note-title">
             <p class="scribble">day 1 / boundary-value SHM notes</p>
             <h2>Given positions at two times, solve the missing motion constants.</h2>
@@ -134,6 +145,51 @@ At those times, the boundary target may be impossible or non-unique.</pre>
                 <figcaption>Vertical spring, equilibrium offset, no damping, period notes.</figcaption>
               </figure>
             </div>
+          </details>
+        </section>
+
+        <section class="lecture-sheet is-hidden" data-note="day02_damping" aria-label="Day 2 notes">
+          <div class="note-title">
+            <p class="scribble">day 2 / damping notes</p>
+            <h2>Damping adds a velocity-force term that drains energy from the oscillator.</h2>
+          </div>
+          <details class="math-dropdown" open>
+            <summary>Show damping math</summary>
+            <pre class="plain-note">Damped oscillator notes
+
+Start with the mass-spring force plus a drag force proportional to velocity:
+
+m x'' = -b x' - kx
+m x'' + b x' + kx = 0
+
+Divide by m:
+
+x'' + (b/m)x' + (k/m)x = 0
+x'' + 2 gamma x' + omega0^2 x = 0
+
+Definitions:
+
+gamma = b / (2m)
+omega0 = sqrt(k/m)
+
+The size of gamma compared to omega0 controls the shape:
+
+gamma &lt; omega0: underdamped
+The mass still oscillates, but the envelope shrinks like e^(-gamma t).
+
+gamma = omega0: critical damping
+The mass returns to equilibrium as fast as possible without overshooting.
+
+gamma &gt; omega0: overdamped
+The mass returns without oscillating, but more slowly than the critical case.
+
+The simulation solves from:
+
+x(0), v(0), m, b, k
+
+and draws x(t), v(t), a(t), and the total force:
+
+F = -kx - bv</pre>
           </details>
         </section>
       </section>
