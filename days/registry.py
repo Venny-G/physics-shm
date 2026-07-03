@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from simulations.day01_boundary_value import model as day01_boundary_value
+from days.day01_boundary_value import model as day01_boundary_value
 
 
 MODULES = [

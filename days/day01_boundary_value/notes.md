@@ -122,6 +122,6 @@ At those times, the requested final position may be impossible or non-unique.
 ## Source images
 
 ```text
-notes/images/lecture-01-spread.jpg
-notes/images/lecture-01-vertical-spring.jpg
+days/day01_boundary_value/images/lecture-01-spread.jpg
+days/day01_boundary_value/images/lecture-01-vertical-spring.jpg
 ```

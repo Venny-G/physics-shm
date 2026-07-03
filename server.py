@@ -4,7 +4,7 @@ import json
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from simulations.registry import list_simulations, solve_simulation
+from days.registry import list_simulations, solve_simulation
 
 
 class Handler(SimpleHTTPRequestHandler):
