@@ -72,7 +72,7 @@ node --check script.js
 ## Study Log
 
 - Day 1: boundary-value SHM. Given `x(0)`, `x(T)`, `T`, `m`, and `k`, solve the missing initial velocity and animate the motion.
-- Day 2: damping. Given `x(0)`, `v(0)`, `m`, `b`, and `k`, classify the motion and animate underdamped, critical, or overdamped behavior.
+- Day 2: damping. Given `x(0)`, `v(0)`, `m`, `b`, and `k`, classify the motion with the OCW weak/strong damping threshold and animate the result.
 - Day 3: driven oscillator, planned.
 - Day 4: coupled oscillator, planned.
 

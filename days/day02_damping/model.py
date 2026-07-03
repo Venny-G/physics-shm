@@ -7,8 +7,8 @@ from dataclasses import dataclass
 SIMULATION = {
     "id": "day02_damping",
     "day": 2,
-    "title": "Damping",
-    "description": "Damped oscillator cases: underdamped, critical, and overdamped.",
+    "title": "Weak and strong damping",
+    "description": "Damped oscillator cases using the OCW gamma^2 vs 4 omega0^2 test.",
 }
 
 
@@ -45,21 +45,26 @@ def solve_damping(data: DampingInput, samples: int = 600) -> dict:
         raise ValueError("duration must be positive")
 
     omega0 = math.sqrt(data.spring / data.mass)
-    gamma = data.damping / (2 * data.mass)
-    case = damping_case(gamma, omega0)
+    gamma = data.damping / data.mass
+    case_id = damping_case(gamma, omega0)
+    case_label = case_title(case_id)
+    omega_prime = omega_prime_for(gamma, omega0, case_id)
+    quality_factor = omega0 / gamma if case_id == "weak" and gamma > 0 else None
     duration = data.duration
     points = []
 
     for index in range(samples):
         t = duration * index / (samples - 1)
-        x, velocity = state_at(t, data.x0, data.v0, gamma, omega0, case)
+        x, velocity = state_at(t, data.x0, data.v0, gamma, omega0, case_id)
         acceleration = -(data.damping * velocity + data.spring * x) / data.mass
         force = data.mass * acceleration
         points.append({"t": t, "x": x, "v": velocity, "a": acceleration, "force": force})
 
     warning = ""
-    if case == "undamped":
-        warning = "b = 0, so this is the Day 1 oscillator with initial position and velocity."
+    if case_id == "none":
+        warning = "b = 0, so there is no damping."
+    elif case_id == "critical":
+        warning = "Critical damping is the boundary between weak oscillation and strong non-oscillation."
 
     return {
         "simulation": SIMULATION,
@@ -73,83 +78,127 @@ def solve_damping(data: DampingInput, samples: int = 600) -> dict:
         },
         "omega0": omega0,
         "gamma": gamma,
-        "case": case,
+        "threshold": 2 * omega0,
+        "omegaPrime": omega_prime,
+        "qualityFactor": quality_factor,
+        "case": case_label,
+        "caseId": case_id,
         "duration": duration,
         "loop": False,
         "warning": warning,
         "points": points,
-        "equationText": equation_text(data, omega0, gamma, case, warning),
+        "equationText": equation_text(data, omega0, gamma, omega_prime, quality_factor, case_id, case_label, warning),
     }
 
 
 def damping_case(gamma: float, omega0: float) -> str:
     if gamma == 0:
-        return "undamped"
-    if abs(gamma - omega0) < 1e-9:
+        return "none"
+    discriminant = gamma**2 - 4 * omega0**2
+    tolerance = 1e-9 * max(1.0, gamma**2, 4 * omega0**2)
+    if abs(discriminant) <= tolerance:
         return "critical"
-    if gamma < omega0:
-        return "underdamped"
-    return "overdamped"
+    if discriminant < 0:
+        return "weak"
+    return "strong"
 
 
-def state_at(t: float, x0: float, v0: float, gamma: float, omega0: float, case: str) -> tuple[float, float]:
-    if case == "undamped":
+def case_title(case_id: str) -> str:
+    return {
+        "none": "no damping",
+        "weak": "weak damping",
+        "critical": "critical damping",
+        "strong": "strong damping",
+    }[case_id]
+
+
+def omega_prime_for(gamma: float, omega0: float, case_id: str) -> float | None:
+    if case_id != "weak":
+        return None
+    return math.sqrt(omega0**2 - (gamma**2 / 4))
+
+
+def state_at(t: float, x0: float, v0: float, gamma: float, omega0: float, case_id: str) -> tuple[float, float]:
+    if case_id == "none":
         x = x0 * math.cos(omega0 * t) + (v0 / omega0) * math.sin(omega0 * t)
         velocity = -x0 * omega0 * math.sin(omega0 * t) + v0 * math.cos(omega0 * t)
         return x, velocity
 
-    if case == "underdamped":
-        omega_d = math.sqrt(omega0**2 - gamma**2)
+    if case_id == "weak":
+        omega_prime = math.sqrt(omega0**2 - (gamma**2 / 4))
         a = x0
-        b = (v0 + gamma * x0) / omega_d
-        envelope = math.exp(-gamma * t)
-        carrier = a * math.cos(omega_d * t) + b * math.sin(omega_d * t)
-        carrier_prime = -a * omega_d * math.sin(omega_d * t) + b * omega_d * math.cos(omega_d * t)
-        return envelope * carrier, envelope * (carrier_prime - gamma * carrier)
+        b = (v0 + (gamma * x0 / 2)) / omega_prime
+        envelope = math.exp(-(gamma * t) / 2)
+        carrier = a * math.cos(omega_prime * t) + b * math.sin(omega_prime * t)
+        carrier_prime = -a * omega_prime * math.sin(omega_prime * t) + b * omega_prime * math.cos(omega_prime * t)
+        return envelope * carrier, envelope * (carrier_prime - (gamma * carrier / 2))
 
-    if case == "critical":
+    if case_id == "critical":
+        alpha = gamma / 2
         a = x0
-        b = v0 + gamma * x0
-        envelope = math.exp(-gamma * t)
+        b = v0 + alpha * x0
+        envelope = math.exp(-alpha * t)
         carrier = a + b * t
-        return envelope * carrier, envelope * (b - gamma * carrier)
+        return envelope * carrier, envelope * (b - alpha * carrier)
 
-    decay = math.sqrt(gamma**2 - omega0**2)
-    r1 = -gamma + decay
-    r2 = -gamma - decay
-    c1 = (v0 - r2 * x0) / (r1 - r2)
-    c2 = x0 - c1
-    x = c1 * math.exp(r1 * t) + c2 * math.exp(r2 * t)
-    velocity = c1 * r1 * math.exp(r1 * t) + c2 * r2 * math.exp(r2 * t)
+    spread = math.sqrt(gamma**2 - 4 * omega0**2)
+    alpha1 = (gamma - spread) / 2
+    alpha2 = (gamma + spread) / 2
+    a = (v0 + alpha2 * x0) / (alpha2 - alpha1)
+    b = x0 - a
+    x = a * math.exp(-alpha1 * t) + b * math.exp(-alpha2 * t)
+    velocity = -alpha1 * a * math.exp(-alpha1 * t) - alpha2 * b * math.exp(-alpha2 * t)
     return x, velocity
 
 
-def equation_text(data: DampingInput, omega0: float, gamma: float, case: str, warning: str) -> str:
+def equation_text(
+    data: DampingInput,
+    omega0: float,
+    gamma: float,
+    omega_prime: float | None,
+    quality_factor: float | None,
+    case_id: str,
+    case_label: str,
+    warning: str,
+) -> str:
     lines = [
         "Python solve:",
         "m x'' + b x' + kx = 0",
-        "x'' + 2 gamma x' + omega0^2 x = 0",
+        "x'' + gamma x' + omega0^2 x = 0",
         "",
         f"omega0 = sqrt(k/m) = {omega0:.3f}",
-        f"gamma = b/(2m) = {gamma:.3f}",
-        f"case = {case}",
+        f"gamma = b/m = {gamma:.3f}",
+        f"2 omega0 = {2 * omega0:.3f}",
+        f"case = {case_label}",
         "",
         "Initial values:",
         f"x(0) = {data.x0:.3f}",
         f"v(0) = {data.v0:.3f}",
         "",
-        "Classification:",
-        "gamma < omega0: underdamped",
-        "gamma = omega0: critical",
-        "gamma > omega0: overdamped",
+        "OCW classification:",
+        "gamma^2 < 4 omega0^2: weak damping",
+        "gamma^2 = 4 omega0^2: critical damping",
+        "gamma^2 > 4 omega0^2: strong damping",
     ]
-    if case == "underdamped":
-        omega_d = math.sqrt(omega0**2 - gamma**2)
-        lines.extend(["", f"omega_d = sqrt(omega0^2 - gamma^2) = {omega_d:.3f}", "x(t) = e^(-gamma t)(A cos(omega_d t) + B sin(omega_d t))"])
-    elif case == "critical":
-        lines.extend(["", "x(t) = e^(-gamma t)(A + Bt)"])
-    elif case == "overdamped":
-        lines.extend(["", "x(t) = C1 e^(r1 t) + C2 e^(r2 t)"])
+    if case_id == "weak":
+        lines.extend(
+            [
+                "",
+                f"omega' = sqrt(omega0^2 - gamma^2/4) = {omega_prime:.3f}",
+                "x(t) = e^(-gamma t/2)(A cos(omega' t) + B sin(omega' t))",
+                f"Q ~= omega0/gamma = {quality_factor:.3f}",
+            ]
+        )
+    elif case_id == "critical":
+        lines.extend(["", "x(t) = e^(-gamma t/2)(A + Bt)"])
+    elif case_id == "strong":
+        lines.extend(
+            [
+                "",
+                "alpha1,2 = (gamma +/- sqrt(gamma^2 - 4 omega0^2)) / 2",
+                "x(t) = A e^(-alpha1 t) + B e^(-alpha2 t)",
+            ]
+        )
     else:
         lines.extend(["", "x(t) = x0 cos(omega0 t) + (v0/omega0) sin(omega0 t)"])
     if warning:

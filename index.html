@@ -38,13 +38,18 @@
           </section>
 
           <section class="control-block compact-controls is-hidden" id="dampingControls">
-            <h2>Damped oscillator: choose x(0), v(0), and damping</h2>
+            <h2>Weak vs strong damping: choose x(0), v(0), and drag</h2>
             <label>Mass, m<input id="dMass" type="number" min="0.2" max="8" step="0.1" value="1" /></label>
             <label>Spring k<input id="dSpring" type="number" min="0.2" max="20" step="0.1" value="4" /></label>
-            <label>Damping b<input id="dDamping" type="number" min="0" max="8" step="0.05" value="0.8" /></label>
+            <label>Drag b<input id="dDamping" type="number" min="0" max="20" step="0.05" value="0.8" /></label>
             <label>x(0)<input id="dx0" type="number" min="-2.5" max="2.5" step="0.05" value="1" /></label>
             <label>v(0)<input id="dv0" type="number" min="-6" max="6" step="0.05" value="0" /></label>
             <label>Duration<input id="dDuration" type="number" min="1" max="20" step="0.25" value="8" /></label>
+            <div class="button-row damping-presets" role="group" aria-label="Damping presets">
+              <button id="weakDamping" type="button">Weak</button>
+              <button id="criticalDamping" type="button">Critical</button>
+              <button id="strongDamping" type="button">Strong</button>
+            </div>
             <p id="dampingWarning" class="warning"></p>
           </section>
 
@@ -150,8 +155,8 @@ At those times, the boundary target may be impossible or non-unique.</pre>
 
         <section class="lecture-sheet is-hidden" data-note="day02_damping" aria-label="Day 2 notes">
           <div class="note-title">
-            <p class="scribble">day 2 / damping notes</p>
-            <h2>Damping adds a velocity-force term that drains energy from the oscillator.</h2>
+            <p class="scribble">day 2 / weak and strong damping notes</p>
+            <h2>Damping can leave a shrinking oscillation or stop oscillation completely.</h2>
           </div>
           <details class="math-dropdown" open>
             <summary>Show damping math</summary>
@@ -162,26 +167,32 @@ Start with the mass-spring force plus a drag force proportional to velocity:
 m x'' = -b x' - kx
 m x'' + b x' + kx = 0
 
-Divide by m:
+Divide by m and match the OCW notation:
 
 x'' + (b/m)x' + (k/m)x = 0
-x'' + 2 gamma x' + omega0^2 x = 0
+x'' + gamma x' + omega0^2 x = 0
 
 Definitions:
 
-gamma = b / (2m)
+gamma = b / m
 omega0 = sqrt(k/m)
 
-The size of gamma compared to omega0 controls the shape:
+The size of gamma^2 compared to 4 omega0^2 controls the shape:
 
-gamma &lt; omega0: underdamped
-The mass still oscillates, but the envelope shrinks like e^(-gamma t).
+gamma^2 &lt; 4 omega0^2: weak damping
+The mass still oscillates, but the envelope shrinks like e^(-gamma t/2).
 
-gamma = omega0: critical damping
+gamma^2 = 4 omega0^2: critical damping
 The mass returns to equilibrium as fast as possible without overshooting.
 
-gamma &gt; omega0: overdamped
-The mass returns without oscillating, but more slowly than the critical case.
+gamma^2 &gt; 4 omega0^2: strong damping
+The motion is a sum of two decaying exponentials and does not oscillate.
+
+For weak damping:
+
+omega' = sqrt(omega0^2 - gamma^2/4)
+x(t) = e^(-gamma t/2)(A cos(omega' t) + B sin(omega' t))
+Q ~= omega0 / gamma
 
 The simulation solves from:
 

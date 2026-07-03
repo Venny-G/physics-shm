@@ -13,6 +13,9 @@ const ui = {
   slowPlayback: qs('#slowPlayback'),
   normalPlayback: qs('#normalPlayback'),
   reset: qs('#reset'),
+  weakDamping: qs('#weakDamping'),
+  criticalDamping: qs('#criticalDamping'),
+  strongDamping: qs('#strongDamping'),
   dayTabs: qsa('.day-tabs button'),
   noteSheets: qsa('[data-note]'),
 };
@@ -179,26 +182,35 @@ function solveDampingInBrowser(params) {
   if (damping < 0) throw new Error('damping must be non-negative.');
 
   const omega0 = Math.sqrt(spring / mass);
-  const gamma = damping / (2 * mass);
-  const caseName = dampingCase(gamma, omega0);
-  const warning = caseName === 'undamped' ? 'b = 0, so this is undamped motion.' : '';
+  const gamma = damping / mass;
+  const caseId = dampingCase(gamma, omega0);
+  const caseName = dampingCaseTitle(caseId);
+  const omegaPrime = caseId === 'weak' ? Math.sqrt(omega0 ** 2 - (gamma ** 2 / 4)) : null;
+  const qualityFactor = caseId === 'weak' && gamma > 0 ? omega0 / gamma : null;
+  let warning = '';
+  if (caseId === 'none') warning = 'b = 0, so there is no damping.';
+  if (caseId === 'critical') warning = 'Critical damping is the boundary between weak oscillation and strong non-oscillation.';
   const points = samplePoints(duration, (t) => {
-    const state = dampingStateAt(t, x0, v0, gamma, omega0, caseName);
+    const state = dampingStateAt(t, x0, v0, gamma, omega0, caseId);
     const a = -(damping * state.v + spring * state.x) / mass;
     return { t, x: state.x, v: state.v, a, force: mass * a };
   });
 
   return {
-    simulation: { id: 'day02_damping', day: 2, title: 'Damping' },
+    simulation: { id: 'day02_damping', day: 2, title: 'Weak and strong damping' },
     input: { mass, spring, damping, x0, v0, duration },
     omega0,
     gamma,
+    threshold: 2 * omega0,
+    omegaPrime,
+    qualityFactor,
     case: caseName,
+    caseId,
     duration,
     loop: false,
     warning,
     points,
-    equationText: dampingEquationText(omega0, gamma, caseName, x0, v0, warning, 'Browser fallback solve:'),
+    equationText: dampingEquationText(omega0, gamma, omegaPrime, qualityFactor, caseId, caseName, x0, v0, warning, 'Browser fallback solve:'),
   };
 }
 
@@ -211,64 +223,82 @@ function samplePoints(duration, fn, samples = 600) {
 }
 
 function dampingCase(gamma, omega0) {
-  if (gamma === 0) return 'undamped';
-  if (Math.abs(gamma - omega0) < 1e-9) return 'critical';
-  return gamma < omega0 ? 'underdamped' : 'overdamped';
+  if (gamma === 0) return 'none';
+  const discriminant = gamma ** 2 - 4 * omega0 ** 2;
+  const tolerance = 1e-9 * Math.max(1, gamma ** 2, 4 * omega0 ** 2);
+  if (Math.abs(discriminant) <= tolerance) return 'critical';
+  return discriminant < 0 ? 'weak' : 'strong';
 }
 
-function dampingStateAt(t, x0, v0, gamma, omega0, caseName) {
-  if (caseName === 'undamped') {
+function dampingCaseTitle(caseId) {
+  return {
+    none: 'no damping',
+    weak: 'weak damping',
+    critical: 'critical damping',
+    strong: 'strong damping',
+  }[caseId];
+}
+
+function dampingStateAt(t, x0, v0, gamma, omega0, caseId) {
+  if (caseId === 'none') {
     return {
       x: x0 * Math.cos(omega0 * t) + (v0 / omega0) * Math.sin(omega0 * t),
       v: -x0 * omega0 * Math.sin(omega0 * t) + v0 * Math.cos(omega0 * t),
     };
   }
-  if (caseName === 'underdamped') {
-    const omegaD = Math.sqrt(omega0 ** 2 - gamma ** 2);
+  if (caseId === 'weak') {
+    const omegaD = Math.sqrt(omega0 ** 2 - (gamma ** 2 / 4));
     const a = x0;
-    const b = (v0 + gamma * x0) / omegaD;
-    const envelope = Math.exp(-gamma * t);
+    const b = (v0 + (gamma * x0 / 2)) / omegaD;
+    const envelope = Math.exp(-(gamma * t) / 2);
     const carrier = a * Math.cos(omegaD * t) + b * Math.sin(omegaD * t);
     const carrierPrime = -a * omegaD * Math.sin(omegaD * t) + b * omegaD * Math.cos(omegaD * t);
-    return { x: envelope * carrier, v: envelope * (carrierPrime - gamma * carrier) };
+    return { x: envelope * carrier, v: envelope * (carrierPrime - (gamma * carrier / 2)) };
   }
-  if (caseName === 'critical') {
+  if (caseId === 'critical') {
+    const alpha = gamma / 2;
     const a = x0;
-    const b = v0 + gamma * x0;
-    const envelope = Math.exp(-gamma * t);
+    const b = v0 + alpha * x0;
+    const envelope = Math.exp(-alpha * t);
     const carrier = a + b * t;
-    return { x: envelope * carrier, v: envelope * (b - gamma * carrier) };
+    return { x: envelope * carrier, v: envelope * (b - alpha * carrier) };
   }
-  const decay = Math.sqrt(gamma ** 2 - omega0 ** 2);
-  const r1 = -gamma + decay;
-  const r2 = -gamma - decay;
-  const c1 = (v0 - r2 * x0) / (r1 - r2);
-  const c2 = x0 - c1;
+  const spread = Math.sqrt(gamma ** 2 - 4 * omega0 ** 2);
+  const alpha1 = (gamma - spread) / 2;
+  const alpha2 = (gamma + spread) / 2;
+  const a = (v0 + alpha2 * x0) / (alpha2 - alpha1);
+  const b = x0 - a;
   return {
-    x: c1 * Math.exp(r1 * t) + c2 * Math.exp(r2 * t),
-    v: c1 * r1 * Math.exp(r1 * t) + c2 * r2 * Math.exp(r2 * t),
+    x: a * Math.exp(-alpha1 * t) + b * Math.exp(-alpha2 * t),
+    v: -alpha1 * a * Math.exp(-alpha1 * t) - alpha2 * b * Math.exp(-alpha2 * t),
   };
 }
 
-function dampingEquationText(omega0, gamma, caseName, x0, v0, warning, heading) {
+function dampingEquationText(omega0, gamma, omegaPrime, qualityFactor, caseId, caseName, x0, v0, warning, heading) {
   const lines = [
     heading,
     "m x'' + b x' + kx = 0",
-    "x'' + 2 gamma x' + omega0^2 x = 0",
+    "x'' + gamma x' + omega0^2 x = 0",
     '',
     `omega0 = ${omega0.toFixed(3)}`,
-    `gamma = ${gamma.toFixed(3)}`,
+    `gamma = b/m = ${gamma.toFixed(3)}`,
+    `2 omega0 = ${(2 * omega0).toFixed(3)}`,
     `case = ${caseName}`,
     '',
     `x(0) = ${x0.toFixed(3)}`,
     `v(0) = ${v0.toFixed(3)}`,
+    '',
+    'OCW classification:',
+    'gamma^2 < 4 omega0^2: weak damping',
+    'gamma^2 = 4 omega0^2: critical damping',
+    'gamma^2 > 4 omega0^2: strong damping',
   ];
-  if (caseName === 'underdamped') {
-    lines.push('', `omega_d = ${Math.sqrt(omega0 ** 2 - gamma ** 2).toFixed(3)}`, 'x(t) = e^(-gamma t)(A cos(omega_d t) + B sin(omega_d t))');
-  } else if (caseName === 'critical') {
-    lines.push('', 'x(t) = e^(-gamma t)(A + Bt)');
-  } else if (caseName === 'overdamped') {
-    lines.push('', 'x(t) = C1 e^(r1 t) + C2 e^(r2 t)');
+  if (caseId === 'weak') {
+    lines.push('', `omega' = ${omegaPrime.toFixed(3)}`, "x(t) = e^(-gamma t/2)(A cos(omega' t) + B sin(omega' t))", `Q ~= omega0/gamma = ${qualityFactor.toFixed(3)}`);
+  } else if (caseId === 'critical') {
+    lines.push('', 'x(t) = e^(-gamma t/2)(A + Bt)');
+  } else if (caseId === 'strong') {
+    lines.push('', 'alpha1,2 = (gamma +/- sqrt(gamma^2 - 4 omega0^2)) / 2', 'x(t) = A e^(-alpha1 t) + B e^(-alpha2 t)');
   } else {
     lines.push('', 'x(t) = x0 cos(omega0 t) + (v0/omega0) sin(omega0 t)');
   }
@@ -310,6 +340,7 @@ function applySolution(payload) {
   solution = payload;
   ui.equationText.textContent = payload.equationText || '';
   setWarning(payload.warning || '');
+  setDampingPresetState(payload.caseId || '');
   simTime = 0;
   lastFrame = performance.now();
 }
@@ -317,6 +348,26 @@ function applySolution(payload) {
 function setWarning(message) {
   ui.boundaryWarning.textContent = activeSimulation === 'day01_boundary_value' ? message : '';
   ui.dampingWarning.textContent = activeSimulation === 'day02_damping' ? message : '';
+}
+
+function setDampingPreset(kind) {
+  const mass = inputNumber('damping', 'mass');
+  const spring = inputNumber('damping', 'spring');
+  const omega0 = Math.sqrt(spring / mass);
+  const criticalGamma = 2 * omega0;
+  const gamma = {
+    weak: criticalGamma * 0.35,
+    critical: criticalGamma,
+    strong: criticalGamma * 1.6,
+  }[kind];
+  controls.damping.damping.value = (gamma * mass).toFixed(2);
+  scheduleSolve(0);
+}
+
+function setDampingPresetState(caseId) {
+  ui.weakDamping.classList.toggle('active', activeSimulation === 'day02_damping' && caseId === 'weak');
+  ui.criticalDamping.classList.toggle('active', activeSimulation === 'day02_damping' && caseId === 'critical');
+  ui.strongDamping.classList.toggle('active', activeSimulation === 'day02_damping' && caseId === 'strong');
 }
 
 function setActiveSimulation(simulationId) {
@@ -333,6 +384,7 @@ function setActiveSimulation(simulationId) {
   });
   ui.noteSheets.forEach((sheet) => sheet.classList.toggle('is-hidden', sheet.dataset.note !== simulationId));
   setWarning('');
+  setDampingPresetState('');
   scheduleSolve(0);
 }
 
@@ -417,8 +469,10 @@ function drawMassSpring(rect, cur) {
   ctx.moveTo(originX, y + 38);
   ctx.lineTo(originX, y + 68);
   ctx.stroke();
-  const caseText = solution.case ? ` ${solution.case}` : '';
-  drawText(`${solution.simulation?.title || 'simulation'}${caseText}`, 24, 30);
+  const titleText = activeSimulation === 'day02_damping' && solution.case
+    ? `Day 2: ${solution.case}`
+    : solution.simulation?.title || 'simulation';
+  drawText(titleText, 24, 30);
   drawText(`x=${cur.x.toFixed(3)} v=${cur.v.toFixed(3)} a=${cur.a.toFixed(3)} F=${cur.force.toFixed(3)}`, 24, 52);
 }
 
@@ -489,6 +543,9 @@ Object.values(controls).forEach((group) => {
   Object.values(group).forEach((input) => input.addEventListener('input', () => scheduleSolve()));
 });
 ui.dayTabs.forEach((button) => button.addEventListener('click', () => setActiveSimulation(button.dataset.sim)));
+ui.weakDamping.addEventListener('click', () => setDampingPreset('weak'));
+ui.criticalDamping.addEventListener('click', () => setDampingPreset('critical'));
+ui.strongDamping.addEventListener('click', () => setDampingPreset('strong'));
 ui.pausePlayback.addEventListener('click', () => setPlayback('pause'));
 ui.slowPlayback.addEventListener('click', () => setPlayback('slow'));
 ui.normalPlayback.addEventListener('click', () => setPlayback('normal'));
