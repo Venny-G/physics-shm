@@ -337,12 +337,21 @@ function scheduleSolve(delay = 250) {
 }
 
 function applySolution(payload) {
-  solution = payload;
+  solution = prepareSolution(payload);
   ui.equationText.textContent = payload.equationText || '';
   setWarning(payload.warning || '');
   setDampingPresetState(payload.caseId || '');
   simTime = 0;
   lastFrame = performance.now();
+}
+
+function prepareSolution(payload) {
+  const points = payload.points || [];
+  return {
+    ...payload,
+    maxAbsX: Math.max(1, ...points.map((p) => Math.abs(p.x))),
+    plotPathCache: null,
+  };
 }
 
 function setWarning(message) {
@@ -428,8 +437,24 @@ function currentPlotTime() {
 function pointAt(time) {
   if (!solution?.points?.length) return null;
   const t = solution.loop === false ? Math.min(time, solution.duration) : time % solution.duration;
-  const idx = Math.round((t / solution.duration) * (solution.points.length - 1));
-  return solution.points[Math.min(solution.points.length - 1, idx)];
+  const scaledIndex = (t / solution.duration) * (solution.points.length - 1);
+  const leftIndex = Math.floor(scaledIndex);
+  const rightIndex = Math.min(solution.points.length - 1, leftIndex + 1);
+  const mix = scaledIndex - leftIndex;
+  const left = solution.points[leftIndex];
+  const right = solution.points[rightIndex];
+  if (!left || !right || left === right) return left || right || null;
+  return interpolatePoint(left, right, mix);
+}
+
+function interpolatePoint(a, b, mix) {
+  return {
+    t: a.t + (b.t - a.t) * mix,
+    x: a.x + (b.x - a.x) * mix,
+    v: a.v + (b.v - a.v) * mix,
+    a: a.a + (b.a - a.a) * mix,
+    force: a.force + (b.force - a.force) * mix,
+  };
 }
 
 function drawSpring(x1, y, x2) {
@@ -451,7 +476,7 @@ function drawMassSpring(rect, cur) {
   const y = rect.height * 0.34;
   const wallX = 70;
   const originX = rect.width * 0.5;
-  const maxAbs = Math.max(1, ...solution.points.map((p) => Math.abs(p.x)));
+  const maxAbs = solution.maxAbsX;
   const scale = Math.min(90, rect.width / (maxAbs * 6));
   const massX = originX + cur.x * scale;
   ctx.fillStyle = '#eaeef2';
@@ -482,7 +507,7 @@ function drawPositionGraph(rect) {
   const gy = rect.height - 155;
   const gw = rect.width - 104;
   const gh = 95;
-  const maxAbs = Math.max(1, ...solution.points.map((p) => Math.abs(p.x)));
+  const maxAbs = solution.maxAbsX;
   ctx.strokeStyle = '#d0d7de';
   ctx.strokeRect(gx, gy, gw, gh);
   ctx.beginPath();
@@ -491,13 +516,18 @@ function drawPositionGraph(rect) {
   ctx.stroke();
   ctx.strokeStyle = activeSimulation === 'day02_damping' ? '#bf8700' : '#0969da';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  solution.points.forEach((p, i) => {
-    const px = gx + (p.t / solution.duration) * gw;
-    const py = gy + gh / 2 - (p.x / maxAbs) * (gh * 0.42);
-    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-  });
-  ctx.stroke();
+  const path = positionGraphPath(gx, gy, gw, gh, maxAbs);
+  if (path) {
+    ctx.stroke(path);
+  } else {
+    ctx.beginPath();
+    solution.points.forEach((p, i) => {
+      const px = gx + (p.t / solution.duration) * gw;
+      const py = gy + gh / 2 - (p.x / maxAbs) * (gh * 0.42);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    });
+    ctx.stroke();
+  }
   const markerX = gx + (currentPlotTime() / solution.duration) * gw;
   ctx.strokeStyle = '#d1242f';
   ctx.beginPath();
@@ -505,6 +535,21 @@ function drawPositionGraph(rect) {
   ctx.lineTo(markerX, gy + gh);
   ctx.stroke();
   drawText('x(t)', gx, gy - 8);
+}
+
+function positionGraphPath(gx, gy, gw, gh, maxAbs) {
+  if (typeof Path2D === 'undefined') return null;
+  const cacheKey = `${gx}:${gy}:${gw}:${gh}:${maxAbs}:${solution.points.length}`;
+  if (solution.plotPathCache?.key === cacheKey) return solution.plotPathCache.path;
+
+  const path = new Path2D();
+  solution.points.forEach((p, i) => {
+    const px = gx + (p.t / solution.duration) * gw;
+    const py = gy + gh / 2 - (p.x / maxAbs) * (gh * 0.42);
+    i ? path.lineTo(px, py) : path.moveTo(px, py);
+  });
+  solution.plotPathCache = { key: cacheKey, path };
+  return path;
 }
 
 function drawTargetMarker(rect) {
