@@ -1,3 +1,6 @@
+###UPDATE 7/3 - DAY 2 IS COMPLETE
+
+
 # Harmonic Oscillators - Ven's Notes
 
 An interactive, note-like browser simulator for learning harmonic motion one
