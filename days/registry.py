@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from days.day01_boundary_value import model as day01_boundary_value
 from days.day02_damping import model as day02_damping
+from days.day03_driven import model as day03_driven
 
 
 MODULES = [
     day01_boundary_value,
     day02_damping,
+    day03_driven,
 ]
 
 SIMULATIONS = {module.SIMULATION["id"]: module for module in MODULES}

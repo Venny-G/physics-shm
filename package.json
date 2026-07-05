@@ -6,7 +6,7 @@
   "scripts": {
     "start": "python3 server.py",
     "check": "npm run check:python && npm run check:js",
-    "check:python": "python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py",
+    "check:python": "python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py days/day03_driven/model.py",
     "check:js": "node --check script.js"
   },
   "keywords": [

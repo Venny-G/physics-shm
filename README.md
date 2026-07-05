@@ -1,4 +1,5 @@
 ###UPDATE 7/3 - DAY 2 IS COMPLETE
+###UPDATE 7/5 - DAY 3 IS COMPLETE
 
 
 # Harmonic Oscillators - Ven's Notes
@@ -35,6 +36,9 @@ days/
   day02_damping/
     model.py
     notes.md
+  day03_driven/
+    model.py
+    notes.md
 ```
 
 - `index.html`, `styles.css`, `script.js`: the current webpage
@@ -42,6 +46,7 @@ days/
 - `days/registry.py`: imports runnable day modules for the API
 - `days/day01_boundary_value/`: Day 1 notes, images, and working solver
 - `days/day02_damping/`: Day 2 notes and working damping solver
+- `days/day03_driven/`: Day 3 notes and working driven oscillator solver
 - `.github/`: GitHub Pages and automation files
 
 ## Run Locally
@@ -68,7 +73,7 @@ npm run check
 The check runs:
 
 ```bash
-python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py
+python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py days/day03_driven/model.py
 node --check script.js
 ```
 
@@ -76,7 +81,7 @@ node --check script.js
 
 - Day 1: boundary-value SHM. Given `x(0)`, `x(T)`, `T`, `m`, and `k`, solve the missing initial velocity and animate the motion.
 - Day 2: damping. Given `x(0)`, `v(0)`, `m`, `b`, and `k`, classify the motion with the OCW weak/strong damping threshold and animate the result.
-- Day 3: driven oscillator, planned.
+- Day 3: driven oscillator. Follow the MIT OCW problem-solving style: translate the physical setup into the generic driven-oscillator equation, then interpret transient response, steady-state amplitude, phase lag, and resonance.
 - Day 4: coupled oscillator, planned.
 
 ## Adding A New Day

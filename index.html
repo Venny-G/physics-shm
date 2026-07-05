@@ -6,7 +6,7 @@
     <title>Ven's Notes: Vibrations and Waves Simulation + Notes</title>
     <link rel="icon" type="image/png" sizes="225x225" href="assets/site-icon.png?v=1" />
     <link rel="apple-touch-icon" href="assets/site-icon.png?v=1" />
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=4" />
   </head>
   <body>
     <main class="shell">
@@ -53,6 +53,24 @@
             <p id="dampingWarning" class="warning"></p>
           </section>
 
+          <section class="control-block compact-controls is-hidden" id="drivenControls">
+            <h2>Driven oscillator: choose force strength and drive frequency</h2>
+            <label>Mass, m<input id="rMass" type="number" min="0.2" max="8" step="0.1" value="1" /></label>
+            <label>Spring k<input id="rSpring" type="number" min="0.2" max="20" step="0.1" value="4" /></label>
+            <label>Drag b<input id="rDamping" type="number" min="0" max="20" step="0.05" value="0.35" /></label>
+            <label>Drive F0<input id="rForce" type="number" min="0" max="20" step="0.1" value="1" /></label>
+            <label>Drive omega<input id="rOmega" type="number" min="0" max="8" step="0.05" value="2" /></label>
+            <label>x(0)<input id="rx0" type="number" min="-2.5" max="2.5" step="0.05" value="0" /></label>
+            <label>v(0)<input id="rv0" type="number" min="-6" max="6" step="0.05" value="0" /></label>
+            <label>Duration<input id="rDuration" type="number" min="4" max="80" step="0.5" value="30" /></label>
+            <div class="button-row driven-presets" role="group" aria-label="Drive frequency presets">
+              <button id="belowDrive" type="button">Below</button>
+              <button id="resonanceDrive" type="button">Resonance</button>
+              <button id="aboveDrive" type="button">Above</button>
+            </div>
+            <p id="drivenWarning" class="warning"></p>
+          </section>
+
           <section class="control-block">
             <h2>Playback</h2>
             <div class="playback-row" role="group" aria-label="Playback speed">
@@ -65,7 +83,7 @@
         </section>
 
         <div class="sim-wrap">
-          <canvas id="simCanvas" width="1280" height="720" aria-label="Boundary value simple harmonic motion simulation"></canvas>
+          <canvas id="simCanvas" width="1280" height="720" aria-label="Harmonic oscillator simulation"></canvas>
         </div>
 
         <section class="equation-card">
@@ -203,9 +221,66 @@ and draws x(t), v(t), a(t), and the total force:
 F = -kx - bv</pre>
           </details>
         </section>
+
+        <section class="lecture-sheet is-hidden" data-note="day03_driven" aria-label="Day 3 notes">
+          <div class="note-title">
+            <p class="scribble">day 3 / driven oscillation notes</p>
+            <h2>An oscillator can be forced into a large response near resonance.</h2>
+          </div>
+          <details class="math-dropdown" open>
+            <summary>Show driven oscillator math</summary>
+            <pre class="plain-note">Driven oscillator notes
+
+Problem-solving style from the MIT video:
+
+1. Start with an ordinary physical situation.
+2. Use the laws of nature to turn it into equations.
+3. Solve the math problem.
+4. Come back and interpret what the answer says physically.
+
+The same math appears in very different systems:
+
+RLC circuit driven by AC voltage
+pendulum with its support shaken sinusoidally
+seismograph with the ground moving sinusoidally
+mass-spring oscillator driven by an outside force
+
+Generic form:
+
+x'' + gamma x' + omega0^2 x = f cos(omega t)
+
+For this simulation:
+
+m x'' + b x' + kx = F0 cos(omega t)
+gamma = b / m
+omega0 = sqrt(k/m)
+f = F0 / m
+
+General shape of the answer:
+
+x(t) = A(omega) cos(omega t - delta) + transient
+
+transient = C e^(-gamma t/2) cos(omega' t + phi)
+
+The transient part depends on the initial conditions.
+Because of damping, it dies away.
+
+The steady-state part stays forever:
+
+A(omega) = f / sqrt((omega0^2 - omega^2)^2 + (gamma omega)^2)
+tan(delta) = gamma omega / (omega0^2 - omega^2)
+
+Interpretation:
+
+If omega is below omega0, the response is mostly in phase with the driver.
+If omega is above omega0, the response is mostly out of phase with the driver.
+Near resonance, the response amplitude becomes large.
+Damping keeps the resonance finite and makes the peak less sharp.</pre>
+          </details>
+        </section>
       </section>
     </main>
 
-    <script src="script.js?v=5"></script>
+    <script src="script.js?v=7"></script>
   </body>
 </html>

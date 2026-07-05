@@ -7,8 +7,10 @@ const ui = {
   equationText: qs('#equationText'),
   boundaryWarning: qs('#boundaryWarning'),
   dampingWarning: qs('#dampingWarning'),
+  drivenWarning: qs('#drivenWarning'),
   boundaryControls: qs('#boundaryControls'),
   dampingControls: qs('#dampingControls'),
+  drivenControls: qs('#drivenControls'),
   pausePlayback: qs('#pausePlayback'),
   slowPlayback: qs('#slowPlayback'),
   normalPlayback: qs('#normalPlayback'),
@@ -16,6 +18,9 @@ const ui = {
   weakDamping: qs('#weakDamping'),
   criticalDamping: qs('#criticalDamping'),
   strongDamping: qs('#strongDamping'),
+  belowDrive: qs('#belowDrive'),
+  resonanceDrive: qs('#resonanceDrive'),
+  aboveDrive: qs('#aboveDrive'),
   dayTabs: qsa('.day-tabs button'),
   noteSheets: qsa('[data-note]'),
 };
@@ -36,6 +41,16 @@ const controls = {
     v0: qs('#dv0'),
     duration: qs('#dDuration'),
   },
+  driven: {
+    mass: qs('#rMass'),
+    spring: qs('#rSpring'),
+    damping: qs('#rDamping'),
+    driveForce: qs('#rForce'),
+    driveOmega: qs('#rOmega'),
+    x0: qs('#rx0'),
+    v0: qs('#rv0'),
+    duration: qs('#rDuration'),
+  },
 };
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5173' : '';
@@ -49,6 +64,11 @@ const SIMS = {
     controls: 'damping',
     warning: ui.dampingWarning,
     fallback: solveDampingInBrowser,
+  },
+  day03_driven: {
+    controls: 'driven',
+    warning: ui.drivenWarning,
+    fallback: solveDrivenInBrowser,
   },
 };
 
@@ -105,8 +125,24 @@ function dampingParams() {
   });
 }
 
+function drivenParams() {
+  return new URLSearchParams({
+    sim: 'day03_driven',
+    m: inputNumber('driven', 'mass'),
+    k: inputNumber('driven', 'spring'),
+    b: inputNumber('driven', 'damping'),
+    F0: inputNumber('driven', 'driveForce'),
+    omega: inputNumber('driven', 'driveOmega'),
+    x0: inputNumber('driven', 'x0'),
+    v0: inputNumber('driven', 'v0'),
+    duration: inputNumber('driven', 'duration'),
+  });
+}
+
 function paramsForActiveSimulation() {
-  return activeSimulation === 'day02_damping' ? dampingParams() : boundaryParams();
+  if (activeSimulation === 'day02_damping') return dampingParams();
+  if (activeSimulation === 'day03_driven') return drivenParams();
+  return boundaryParams();
 }
 
 function solveBoundaryInBrowser(params) {
@@ -214,10 +250,119 @@ function solveDampingInBrowser(params) {
   };
 }
 
+function solveDrivenInBrowser(params) {
+  const mass = Number(params.get('m') || 1);
+  const spring = Number(params.get('k') || 4);
+  const damping = Number(params.get('b') || 0.35);
+  const driveForce = Number(params.get('F0') || 1);
+  const driveOmega = Number(params.get('omega') || 2);
+  const x0 = Number(params.get('x0') || 0);
+  const v0 = Number(params.get('v0') || 0);
+  const duration = Number(params.get('duration') || 30);
+  if (mass <= 0 || spring <= 0 || duration <= 0) throw new Error('m, k, and duration must be positive.');
+  if (damping < 0) throw new Error('damping must be non-negative.');
+  if (driveOmega < 0) throw new Error('drive frequency must be non-negative.');
+
+  const omega0 = Math.sqrt(spring / mass);
+  const gamma = damping / mass;
+  const resonanceOmega = resonanceFrequency(omega0, gamma);
+  const responseAmplitude = steadyResponseAmplitude(driveForce / mass, omega0, gamma, driveOmega);
+  const phaseDelta = phaseLag(omega0, gamma, driveOmega);
+  const warning = damping === 0 ? 'No damping: near resonance, the driven response can grow very large.' : '';
+  const points = drivenPoints({ mass, spring, damping, driveForce, driveOmega, x0, v0, duration }, 900);
+  const responseCurve = responseCurvePoints(driveForce / mass, omega0, gamma, driveOmega);
+
+  return {
+    simulation: { id: 'day03_driven', day: 3, title: 'Driven oscillations' },
+    input: { mass, spring, damping, driveForce, driveOmega, x0, v0, duration },
+    omega0,
+    gamma,
+    resonanceOmega,
+    responseAmplitude,
+    phaseDelta,
+    duration,
+    loop: false,
+    warning,
+    points,
+    responseCurve,
+    equationText: drivenEquationText(omega0, gamma, driveOmega, resonanceOmega, responseAmplitude, phaseDelta, x0, v0, warning, 'Browser fallback solve:'),
+  };
+}
+
 function samplePoints(duration, fn, samples = 600) {
   const points = [];
   for (let i = 0; i < samples; i++) {
     points.push(fn((duration * i) / (samples - 1)));
+  }
+  return points;
+}
+
+function drivenPoints(input, samples) {
+  let t = 0;
+  let x = input.x0;
+  let v = input.v0;
+  const dt = input.duration / (samples - 1);
+  const points = [];
+  for (let i = 0; i < samples; i++) {
+    points.push(drivenPointAt(t, x, v, input));
+    if (i < samples - 1) {
+      const next = rk4DrivenStep(t, x, v, dt, input);
+      x = next.x;
+      v = next.v;
+      t += dt;
+    }
+  }
+  return points;
+}
+
+function drivenPointAt(t, x, v, input) {
+  const drive = input.driveForce * Math.cos(input.driveOmega * t);
+  const a = (drive - input.damping * v - input.spring * x) / input.mass;
+  return { t, x, v, a, force: input.mass * a, drive };
+}
+
+function rk4DrivenStep(t, x, v, dt, input) {
+  const derivative = (time, stateX, stateV) => {
+    const drive = input.driveForce * Math.cos(input.driveOmega * time);
+    return {
+      dx: stateV,
+      dv: (drive - input.damping * stateV - input.spring * stateX) / input.mass,
+    };
+  };
+  const k1 = derivative(t, x, v);
+  const k2 = derivative(t + dt / 2, x + k1.dx * dt / 2, v + k1.dv * dt / 2);
+  const k3 = derivative(t + dt / 2, x + k2.dx * dt / 2, v + k2.dv * dt / 2);
+  const k4 = derivative(t + dt, x + k3.dx * dt, v + k3.dv * dt);
+  return {
+    x: x + (dt / 6) * (k1.dx + 2 * k2.dx + 2 * k3.dx + k4.dx),
+    v: v + (dt / 6) * (k1.dv + 2 * k2.dv + 2 * k3.dv + k4.dv),
+  };
+}
+
+function resonanceFrequency(omega0, gamma) {
+  const value = omega0 ** 2 - gamma ** 2 / 2;
+  return value > 0 ? Math.sqrt(value) : 0;
+}
+
+function steadyResponseAmplitude(forcePerMass, omega0, gamma, driveOmega) {
+  const denominator = Math.hypot(omega0 ** 2 - driveOmega ** 2, gamma * driveOmega);
+  return denominator ? Math.abs(forcePerMass) / denominator : Infinity;
+}
+
+function phaseLag(omega0, gamma, driveOmega) {
+  return Math.atan2(gamma * driveOmega, omega0 ** 2 - driveOmega ** 2);
+}
+
+function responseCurvePoints(forcePerMass, omega0, gamma, driveOmega, samples = 180) {
+  const omegaMax = Math.max(omega0 * 2.5, driveOmega * 1.25, 1);
+  const points = [];
+  for (let i = 0; i < samples; i++) {
+    const omega = (omegaMax * i) / (samples - 1);
+    points.push({
+      omega,
+      amplitude: steadyResponseAmplitude(forcePerMass, omega0, gamma, omega),
+      phaseDelta: phaseLag(omega0, gamma, omega),
+    });
   }
   return points;
 }
@@ -306,6 +451,41 @@ function dampingEquationText(omega0, gamma, omegaPrime, qualityFactor, caseId, c
   return lines.join('\n');
 }
 
+function drivenEquationText(omega0, gamma, driveOmega, resonanceOmega, responseAmplitude, phaseDelta, x0, v0, warning, heading) {
+  const lines = [
+    heading,
+    'Step 1: physical setup -> equation of motion',
+    "m x'' + b x' + kx = F0 cos(omega t)",
+    "x'' + gamma x' + omega0^2 x = (F0/m) cos(omega t)",
+    '',
+    'Step 2: solve the generic math problem',
+    'x(t) = A(omega) cos(omega t - delta) + transient',
+    "transient = C e^(-gamma t/2) cos(omega' t + phi)",
+    '',
+    `omega0 = ${omega0.toFixed(3)}`,
+    `gamma = b/m = ${gamma.toFixed(3)}`,
+    `drive omega = ${driveOmega.toFixed(3)}`,
+    `resonance estimate = ${resonanceOmega.toFixed(3)}`,
+    `A(omega) = ${formatNumber(responseAmplitude)}`,
+    `delta = ${phaseDelta.toFixed(3)} rad`,
+    '',
+    `x(0) = ${x0.toFixed(3)}`,
+    `v(0) = ${v0.toFixed(3)}`,
+    '',
+    'Step 3: interpret the answer',
+    'early motion = transient + steady-state response',
+    'late motion = steady-state response at the drive frequency',
+    'below omega0: response mostly in phase',
+    'above omega0: response mostly out of phase',
+  ];
+  if (warning) lines.push('', `warning: ${warning}`);
+  return lines.join('\n');
+}
+
+function formatNumber(value) {
+  return Number.isFinite(value) ? value.toFixed(3) : 'infinite';
+}
+
 function scheduleSolve(delay = 250) {
   clearTimeout(solveTimer);
   solveTimer = setTimeout(async () => {
@@ -320,7 +500,7 @@ function scheduleSolve(delay = 250) {
     });
     if (id !== pendingId) return;
     if (!ok) {
-      if (!payload?.error) {
+      if (!payload?.error || payload.error.includes('unknown simulation')) {
         applySolution(config.fallback(params));
         currentAbort = null;
         return;
@@ -341,6 +521,7 @@ function applySolution(payload) {
   ui.equationText.textContent = payload.equationText || '';
   setWarning(payload.warning || '');
   setDampingPresetState(payload.caseId || '');
+  setDrivePresetState();
   simTime = 0;
   lastFrame = performance.now();
 }
@@ -351,12 +532,14 @@ function prepareSolution(payload) {
     ...payload,
     maxAbsX: Math.max(1, ...points.map((p) => Math.abs(p.x))),
     plotPathCache: null,
+    responsePathCache: null,
   };
 }
 
 function setWarning(message) {
   ui.boundaryWarning.textContent = activeSimulation === 'day01_boundary_value' ? message : '';
   ui.dampingWarning.textContent = activeSimulation === 'day02_damping' ? message : '';
+  ui.drivenWarning.textContent = activeSimulation === 'day03_driven' ? message : '';
 }
 
 function setDampingPreset(kind) {
@@ -379,21 +562,58 @@ function setDampingPresetState(caseId) {
   ui.strongDamping.classList.toggle('active', activeSimulation === 'day02_damping' && caseId === 'strong');
 }
 
+function setDrivePreset(kind) {
+  const mass = inputNumber('driven', 'mass');
+  const spring = inputNumber('driven', 'spring');
+  const damping = inputNumber('driven', 'damping');
+  const omega0 = Math.sqrt(spring / mass);
+  const gamma = damping / mass;
+  const resonance = resonanceFrequency(omega0, gamma);
+  const omega = {
+    below: omega0 * 0.65,
+    resonance: resonance || omega0,
+    above: omega0 * 1.35,
+  }[kind];
+  controls.driven.driveOmega.value = omega.toFixed(2);
+  scheduleSolve(0);
+}
+
+function setDrivePresetState() {
+  if (activeSimulation !== 'day03_driven' || !solution) {
+    ui.belowDrive.classList.toggle('active', false);
+    ui.resonanceDrive.classList.toggle('active', false);
+    ui.aboveDrive.classList.toggle('active', false);
+    return;
+  }
+  const driveOmega = solution.input?.driveOmega || 0;
+  const omega0 = solution.omega0 || 1;
+  const resonance = solution.resonanceOmega || omega0;
+  ui.belowDrive.classList.toggle('active', Math.abs(driveOmega - omega0 * 0.65) < 0.03);
+  ui.resonanceDrive.classList.toggle('active', Math.abs(driveOmega - resonance) < 0.03);
+  ui.aboveDrive.classList.toggle('active', Math.abs(driveOmega - omega0 * 1.35) < 0.03);
+}
+
 function setActiveSimulation(simulationId) {
   if (!SIMS[simulationId]) return;
   activeSimulation = simulationId;
   solution = null;
   solveError = '';
+  pendingId += 1;
+  if (currentAbort) currentAbort.abort();
+  qsa('.controls, .sim-wrap, .equation-card').forEach((panel) => panel.classList.toggle('is-hidden', false));
   ui.boundaryControls.classList.toggle('is-hidden', simulationId !== 'day01_boundary_value');
   ui.dampingControls.classList.toggle('is-hidden', simulationId !== 'day02_damping');
+  ui.drivenControls.classList.toggle('is-hidden', simulationId !== 'day03_driven');
   ui.dayTabs.forEach((button) => {
     const isActive = button.dataset.sim === simulationId;
     button.classList.toggle('active', isActive);
     button.classList.toggle('ghost', !isActive);
   });
   ui.noteSheets.forEach((sheet) => sheet.classList.toggle('is-hidden', sheet.dataset.note !== simulationId));
+  ui.equationText.textContent = '';
   setWarning('');
   setDampingPresetState('');
+  setDrivePresetState();
   scheduleSolve(0);
 }
 
@@ -454,7 +674,16 @@ function interpolatePoint(a, b, mix) {
     v: a.v + (b.v - a.v) * mix,
     a: a.a + (b.a - a.a) * mix,
     force: a.force + (b.force - a.force) * mix,
+    drive: (a.drive || 0) + ((b.drive || 0) - (a.drive || 0)) * mix,
   };
+}
+
+function simulationColor() {
+  return {
+    day01_boundary_value: '#d1242f',
+    day02_damping: '#bf8700',
+    day03_driven: '#1f883d',
+  }[activeSimulation] || '#0969da';
 }
 
 function drawSpring(x1, y, x2) {
@@ -484,21 +713,43 @@ function drawMassSpring(rect, cur) {
   ctx.fillStyle = '#24292f';
   ctx.fillRect(wallX - 4, y - 70, 4, 140);
   drawSpring(wallX, y, massX - 28);
-  ctx.fillStyle = activeSimulation === 'day02_damping' ? '#bf8700' : '#d1242f';
+  ctx.fillStyle = simulationColor();
   ctx.strokeStyle = '#24292f';
   ctx.lineWidth = 1;
   ctx.fillRect(massX - 28, y - 24, 56, 48);
   ctx.strokeRect(massX - 28, y - 24, 56, 48);
+  if (activeSimulation === 'day03_driven') drawDriveArrow(massX, y, cur);
   ctx.strokeStyle = '#0969da';
   ctx.beginPath();
   ctx.moveTo(originX, y + 38);
   ctx.lineTo(originX, y + 68);
   ctx.stroke();
-  const titleText = activeSimulation === 'day02_damping' && solution.case
-    ? `Day 2: ${solution.case}`
-    : solution.simulation?.title || 'simulation';
+  const titleText = solution.simulation?.title || 'simulation';
   drawText(titleText, 24, 30);
   drawText(`x=${cur.x.toFixed(3)} v=${cur.v.toFixed(3)} a=${cur.a.toFixed(3)} F=${cur.force.toFixed(3)}`, 24, 52);
+}
+
+function drawDriveArrow(massX, y, cur) {
+  const driveForce = solution.input?.driveForce ?? 1;
+  if (driveForce === 0) return;
+  const length = Math.max(12, Math.min(70, Math.abs(cur.drive || 0) / Math.max(0.1, driveForce) * 70));
+  const direction = (cur.drive || 0) >= 0 ? 1 : -1;
+  const startX = massX + direction * 38;
+  const endX = startX + direction * length;
+  ctx.strokeStyle = '#1f883d';
+  ctx.fillStyle = '#1f883d';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(startX, y - 46);
+  ctx.lineTo(endX, y - 46);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(endX, y - 46);
+  ctx.lineTo(endX - direction * 8, y - 52);
+  ctx.lineTo(endX - direction * 8, y - 40);
+  ctx.closePath();
+  ctx.fill();
+  drawText('drive', Math.min(startX, endX), y - 58, '#1f883d');
 }
 
 function drawPositionGraph(rect) {
@@ -514,7 +765,7 @@ function drawPositionGraph(rect) {
   ctx.moveTo(gx, gy + gh / 2);
   ctx.lineTo(gx + gw, gy + gh / 2);
   ctx.stroke();
-  ctx.strokeStyle = activeSimulation === 'day02_damping' ? '#bf8700' : '#0969da';
+  ctx.strokeStyle = activeSimulation === 'day01_boundary_value' ? '#0969da' : simulationColor();
   ctx.lineWidth = 2;
   const path = positionGraphPath(gx, gy, gw, gh, maxAbs);
   if (path) {
@@ -535,6 +786,75 @@ function drawPositionGraph(rect) {
   ctx.lineTo(markerX, gy + gh);
   ctx.stroke();
   drawText('x(t)', gx, gy - 8);
+}
+
+function drawResponseGraph(rect) {
+  if (activeSimulation !== 'day03_driven' || !solution?.responseCurve?.length) return;
+  const gw = Math.min(280, rect.width * 0.34);
+  const gh = 92;
+  if (gw < 190 || rect.height < 300) return;
+  const gx = rect.width - gw - 34;
+  const gy = 24;
+  const curve = solution.responseCurve.filter((p) => Number.isFinite(p.amplitude));
+  if (!curve.length) return;
+  const omegaMax = Math.max(...curve.map((p) => p.omega), 1);
+  const ampMax = Math.max(1, ...curve.map((p) => p.amplitude));
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+  ctx.fillRect(gx - 8, gy - 18, gw + 16, gh + 42);
+  ctx.strokeStyle = '#d0d7de';
+  ctx.strokeRect(gx, gy, gw, gh);
+  ctx.strokeStyle = '#1f883d';
+  ctx.lineWidth = 2;
+  const path = responseGraphPath(gx, gy, gw, gh, omegaMax, ampMax);
+  if (path) {
+    ctx.stroke(path);
+  } else {
+    ctx.beginPath();
+    curve.forEach((p, i) => {
+      const px = gx + (p.omega / omegaMax) * gw;
+      const py = gy + gh - (p.amplitude / ampMax) * (gh * 0.86);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    });
+    ctx.stroke();
+  }
+
+  drawFrequencyMarker(gx, gy, gw, gh, omegaMax, solution.omega0, '#8250df', 'omega0');
+  drawFrequencyMarker(gx, gy, gw, gh, omegaMax, solution.resonanceOmega, '#bf8700', 'res');
+  drawFrequencyMarker(gx, gy, gw, gh, omegaMax, solution.input?.driveOmega, '#d1242f', 'drive');
+  drawText('A(omega)', gx, gy - 6);
+  drawText(`delta=${formatNumber(solution.phaseDelta)} rad`, gx, gy + gh + 24, '#1f883d');
+}
+
+function responseGraphPath(gx, gy, gw, gh, omegaMax, ampMax) {
+  if (typeof Path2D === 'undefined') return null;
+  const cacheKey = `${gx}:${gy}:${gw}:${gh}:${omegaMax}:${ampMax}:${solution.responseCurve.length}`;
+  if (solution.responsePathCache?.key === cacheKey) return solution.responsePathCache.path;
+
+  const path = new Path2D();
+  let drawn = false;
+  solution.responseCurve.forEach((p) => {
+    if (!Number.isFinite(p.amplitude)) return;
+    const px = gx + (p.omega / omegaMax) * gw;
+    const py = gy + gh - (p.amplitude / ampMax) * (gh * 0.86);
+    drawn ? path.lineTo(px, py) : path.moveTo(px, py);
+    drawn = true;
+  });
+  solution.responsePathCache = { key: cacheKey, path };
+  return path;
+}
+
+function drawFrequencyMarker(gx, gy, gw, gh, omegaMax, omega, color, label) {
+  if (omega == null || !Number.isFinite(omega)) return;
+  const x = gx + (Math.min(omega, omegaMax) / omegaMax) * gw;
+  ctx.strokeStyle = color;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x, gy);
+  ctx.lineTo(x, gy + gh);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  drawText(label, x + 3, gy + 12, color);
 }
 
 function positionGraphPath(gx, gy, gw, gh, maxAbs) {
@@ -591,6 +911,9 @@ ui.dayTabs.forEach((button) => button.addEventListener('click', () => setActiveS
 ui.weakDamping.addEventListener('click', () => setDampingPreset('weak'));
 ui.criticalDamping.addEventListener('click', () => setDampingPreset('critical'));
 ui.strongDamping.addEventListener('click', () => setDampingPreset('strong'));
+ui.belowDrive.addEventListener('click', () => setDrivePreset('below'));
+ui.resonanceDrive.addEventListener('click', () => setDrivePreset('resonance'));
+ui.aboveDrive.addEventListener('click', () => setDrivePreset('above'));
 ui.pausePlayback.addEventListener('click', () => setPlayback('pause'));
 ui.slowPlayback.addEventListener('click', () => setPlayback('slow'));
 ui.normalPlayback.addEventListener('click', () => setPlayback('normal'));
@@ -615,6 +938,7 @@ scheduleSolve(0);
   }
   const cur = pointAt(simTime);
   if (cur) drawMassSpring(rect, cur);
+  drawResponseGraph(rect);
   drawPositionGraph(rect);
   drawTargetMarker(rect);
   requestAnimationFrame(loop);
