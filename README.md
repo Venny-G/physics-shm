@@ -76,38 +76,3 @@ The check runs:
 python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py days/day03_driven/model.py
 node --check script.js
 ```
-
-## Study Log
-
-- Day 1: boundary-value SHM. Given `x(0)`, `x(T)`, `T`, `m`, and `k`, solve the missing initial velocity and animate the motion.
-- Day 2: damping. Given `x(0)`, `v(0)`, `m`, `b`, and `k`, classify the motion with the OCW weak/strong damping threshold and animate the result.
-- Day 3: driven oscillator. Follow the MIT OCW problem-solving style: translate the physical setup into the generic driven-oscillator equation, then interpret transient response, steady-state amplitude, phase lag, and resonance.
-- Day 4: coupled oscillator, planned.
-
-## Adding A New Day
-
-1. Add a folder under `days/`, such as `days/day03_driven/`.
-2. Give it its own `notes.md` and `model.py`.
-3. Add a `SIMULATION` dictionary and `solve_from_params` in `model.py`.
-4. Register the module in `days/registry.py` when it is ready to run.
-5. Add or activate the matching day button in `index.html`.
-6. Update `script.js` only when the new day needs different controls or drawing.
-
-## Day 1 Equation
-
-For ideal 1D SHM:
-
-```text
-mx'' = -kx
-x'' + (k/m)x = 0
-w0 = sqrt(k/m)
-```
-
-Boundary solve:
-
-```text
-v0 = w0 * (xT - x0 cos(w0 T)) / sin(w0 T)
-A = sqrt(x0^2 + (v0/w0)^2)
-phi = atan2(-v0/w0, x0)
-x(t) = A cos(w0 t + phi)
-```
