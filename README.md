@@ -1,5 +1,5 @@
-###UPDATE 7/3 - DAY 2 IS COMPLETE
-###UPDATE 7/5 - DAY 3 IS COMPLETE
+### UPDATE 7/3 - DAY 2 IS COMPLETE
+### UPDATE 7/5 - DAY 3 IS COMPLETE
 
 
 # Harmonic Oscillators - Ven's Notes
