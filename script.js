@@ -734,22 +734,22 @@ function drawDriveArrow(massX, y, cur) {
   if (driveForce === 0) return;
   const length = Math.max(12, Math.min(70, Math.abs(cur.drive || 0) / Math.max(0.1, driveForce) * 70));
   const direction = (cur.drive || 0) >= 0 ? 1 : -1;
-  const startX = massX + direction * 38;
+  const startX = massX;
   const endX = startX + direction * length;
   ctx.strokeStyle = '#1f883d';
   ctx.fillStyle = '#1f883d';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(startX, y - 46);
-  ctx.lineTo(endX, y - 46);
+  ctx.moveTo(startX, y);
+  ctx.lineTo(endX, y);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(endX, y - 46);
-  ctx.lineTo(endX - direction * 8, y - 52);
-  ctx.lineTo(endX - direction * 8, y - 40);
+  ctx.moveTo(endX, y);
+  ctx.lineTo(endX - direction * 8, y - 6);
+  ctx.lineTo(endX - direction * 8, y + 6);
   ctx.closePath();
   ctx.fill();
-  drawText('drive', Math.min(startX, endX), y - 58, '#1f883d');
+  drawText('drive', Math.min(startX, endX), y - 12, '#1f883d');
 }
 
 function drawPositionGraph(rect) {
