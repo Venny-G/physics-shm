@@ -71,6 +71,24 @@
             <p id="drivenWarning" class="warning"></p>
           </section>
 
+          <section class="control-block compact-controls is-hidden" id="coupledControls">
+            <h2>Coupled oscillators: choose two starting positions</h2>
+            <label>Mass, m<input id="cMass" type="number" min="0.2" max="8" step="0.1" value="1" /></label>
+            <label>Spring k<input id="cSpring" type="number" min="0.2" max="20" step="0.1" value="4" /></label>
+            <label>Coupling kc<input id="cCoupling" type="number" min="0" max="20" step="0.1" value="1.5" /></label>
+            <label>x1(0)<input id="cx1" type="number" min="-2.5" max="2.5" step="0.05" value="1" /></label>
+            <label>x2(0)<input id="cx2" type="number" min="-2.5" max="2.5" step="0.05" value="0" /></label>
+            <label>v1(0)<input id="cv1" type="number" min="-6" max="6" step="0.05" value="0" /></label>
+            <label>v2(0)<input id="cv2" type="number" min="-6" max="6" step="0.05" value="0" /></label>
+            <label>Duration<input id="cDuration" type="number" min="4" max="80" step="0.5" value="30" /></label>
+            <div class="button-row coupled-presets" role="group" aria-label="Coupled oscillator presets">
+              <button id="inPhaseCoupled" type="button">In phase</button>
+              <button id="outPhaseCoupled" type="button">Out phase</button>
+              <button id="beatCoupled" type="button">Beat</button>
+            </div>
+            <p id="coupledWarning" class="warning"></p>
+          </section>
+
           <section class="control-block">
             <h2>Playback</h2>
             <div class="playback-row" role="group" aria-label="Playback speed">
@@ -292,9 +310,66 @@ Near resonance, the response amplitude becomes large.
 Damping keeps the resonance finite and makes the peak less sharp.</pre>
           </details>
         </section>
+
+        <section class="lecture-sheet is-hidden" data-note="day04_coupled" aria-label="Day 4 notes">
+          <div class="note-title">
+            <p class="scribble">day 4 / coupled oscillator notes</p>
+            <h2>Two masses can be understood as a mixture of two normal modes.</h2>
+          </div>
+          <details class="math-dropdown" open>
+            <summary>Show coupled oscillator math</summary>
+            <pre class="plain-note">Coupled oscillator notes
+
+Setup:
+
+wall -- spring k -- mass 1 -- coupling spring kc -- mass 2 -- spring k -- wall
+
+No damping and no driving.
+
+Equations:
+
+m x1'' = -k x1 - kc(x1 - x2)
+m x2'' = -k x2 - kc(x2 - x1)
+
+This looks harder because x1 and x2 affect each other.
+The trick is to use normal coordinates:
+
+q+ = (x1 + x2) / 2
+q- = (x1 - x2) / 2
+
+q+ means both masses move together.
+q- means the masses move opposite ways.
+
+After substituting, the equations separate:
+
+q+'' + (k/m)q+ = 0
+q-'' + ((k + 2kc)/m)q- = 0
+
+Normal mode frequencies:
+
+omega_in = sqrt(k/m)
+omega_out = sqrt((k + 2kc)/m)
+
+In-phase mode:
+x1 = x2, so the middle spring does not stretch.
+Only the two wall springs matter.
+
+Out-of-phase mode:
+x1 = -x2, so the middle spring stretches extra.
+That makes the frequency higher.
+
+Any starting motion is a superposition:
+
+x1 = q+ + q-
+x2 = q+ - q-
+
+When both modes are present, the motion can look like energy moving back and forth
+between the masses. That is the beat case.</pre>
+          </details>
+        </section>
       </section>
     </main>
 
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=8"></script>
   </body>
 </html>

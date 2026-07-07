@@ -8,9 +8,11 @@ const ui = {
   boundaryWarning: qs('#boundaryWarning'),
   dampingWarning: qs('#dampingWarning'),
   drivenWarning: qs('#drivenWarning'),
+  coupledWarning: qs('#coupledWarning'),
   boundaryControls: qs('#boundaryControls'),
   dampingControls: qs('#dampingControls'),
   drivenControls: qs('#drivenControls'),
+  coupledControls: qs('#coupledControls'),
   pausePlayback: qs('#pausePlayback'),
   slowPlayback: qs('#slowPlayback'),
   normalPlayback: qs('#normalPlayback'),
@@ -21,6 +23,9 @@ const ui = {
   belowDrive: qs('#belowDrive'),
   resonanceDrive: qs('#resonanceDrive'),
   aboveDrive: qs('#aboveDrive'),
+  inPhaseCoupled: qs('#inPhaseCoupled'),
+  outPhaseCoupled: qs('#outPhaseCoupled'),
+  beatCoupled: qs('#beatCoupled'),
   dayTabs: qsa('.day-tabs button'),
   noteSheets: qsa('[data-note]'),
 };
@@ -51,6 +56,16 @@ const controls = {
     v0: qs('#rv0'),
     duration: qs('#rDuration'),
   },
+  coupled: {
+    mass: qs('#cMass'),
+    spring: qs('#cSpring'),
+    coupling: qs('#cCoupling'),
+    x1: qs('#cx1'),
+    x2: qs('#cx2'),
+    v1: qs('#cv1'),
+    v2: qs('#cv2'),
+    duration: qs('#cDuration'),
+  },
 };
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5173' : '';
@@ -69,6 +84,11 @@ const SIMS = {
     controls: 'driven',
     warning: ui.drivenWarning,
     fallback: solveDrivenInBrowser,
+  },
+  day04_coupled: {
+    controls: 'coupled',
+    warning: ui.coupledWarning,
+    fallback: solveCoupledInBrowser,
   },
 };
 
@@ -139,9 +159,24 @@ function drivenParams() {
   });
 }
 
+function coupledParams() {
+  return new URLSearchParams({
+    sim: 'day04_coupled',
+    m: inputNumber('coupled', 'mass'),
+    k: inputNumber('coupled', 'spring'),
+    kc: inputNumber('coupled', 'coupling'),
+    x1: inputNumber('coupled', 'x1'),
+    x2: inputNumber('coupled', 'x2'),
+    v1: inputNumber('coupled', 'v1'),
+    v2: inputNumber('coupled', 'v2'),
+    duration: inputNumber('coupled', 'duration'),
+  });
+}
+
 function paramsForActiveSimulation() {
   if (activeSimulation === 'day02_damping') return dampingParams();
   if (activeSimulation === 'day03_driven') return drivenParams();
+  if (activeSimulation === 'day04_coupled') return coupledParams();
   return boundaryParams();
 }
 
@@ -286,6 +321,70 @@ function solveDrivenInBrowser(params) {
     points,
     responseCurve,
     equationText: drivenEquationText(omega0, gamma, driveOmega, resonanceOmega, responseAmplitude, phaseDelta, x0, v0, warning, 'Browser fallback solve:'),
+  };
+}
+
+function solveCoupledInBrowser(params) {
+  const mass = Number(params.get('m') || 1);
+  const spring = Number(params.get('k') || 4);
+  const coupling = Number(params.get('kc') || 1.5);
+  const x1 = Number(params.get('x1') || 1);
+  const x2 = Number(params.get('x2') || 0);
+  const v1 = Number(params.get('v1') || 0);
+  const v2 = Number(params.get('v2') || 0);
+  const duration = Number(params.get('duration') || 30);
+  if (mass <= 0 || spring <= 0 || duration <= 0) throw new Error('m, k, and duration must be positive.');
+  if (coupling < 0) throw new Error('coupling spring must be non-negative.');
+
+  const omegaIn = Math.sqrt(spring / mass);
+  const omegaOut = Math.sqrt((spring + 2 * coupling) / mass);
+  const input = { mass, spring, coupling, x1, x2, v1, v2, duration };
+  const points = samplePoints(duration, (t) => coupledStateAt(t, input, omegaIn, omegaOut), 900);
+
+  return {
+    simulation: { id: 'day04_coupled', day: 4, title: 'Coupled oscillators' },
+    input,
+    omegaIn,
+    omegaOut,
+    duration,
+    loop: true,
+    warning: '',
+    points,
+    equationText: coupledEquationText(input, omegaIn, omegaOut, 'Browser fallback solve:'),
+  };
+}
+
+function coupledStateAt(t, input, omegaIn, omegaOut) {
+  const qPlus0 = (input.x1 + input.x2) / 2;
+  const qMinus0 = (input.x1 - input.x2) / 2;
+  const vPlus0 = (input.v1 + input.v2) / 2;
+  const vMinus0 = (input.v1 - input.v2) / 2;
+  const qPlus = qPlus0 * Math.cos(omegaIn * t) + (vPlus0 / omegaIn) * Math.sin(omegaIn * t);
+  const qMinus = qMinus0 * Math.cos(omegaOut * t) + (vMinus0 / omegaOut) * Math.sin(omegaOut * t);
+  const vPlus = -qPlus0 * omegaIn * Math.sin(omegaIn * t) + vPlus0 * Math.cos(omegaIn * t);
+  const vMinus = -qMinus0 * omegaOut * Math.sin(omegaOut * t) + vMinus0 * Math.cos(omegaOut * t);
+  const x1 = qPlus + qMinus;
+  const x2 = qPlus - qMinus;
+  const v1 = vPlus + vMinus;
+  const v2 = vPlus - vMinus;
+  const a1 = (-(input.spring + input.coupling) * x1 + input.coupling * x2) / input.mass;
+  const a2 = (input.coupling * x1 - (input.spring + input.coupling) * x2) / input.mass;
+  return {
+    t,
+    x: x1,
+    v: v1,
+    a: a1,
+    force: input.mass * a1,
+    x1,
+    x2,
+    v1,
+    v2,
+    a1,
+    a2,
+    force1: input.mass * a1,
+    force2: input.mass * a2,
+    qPlus,
+    qMinus,
   };
 }
 
@@ -482,6 +581,34 @@ function drivenEquationText(omega0, gamma, driveOmega, resonanceOmega, responseA
   return lines.join('\n');
 }
 
+function coupledEquationText(input, omegaIn, omegaOut, heading) {
+  return [
+    heading,
+    'Two masses, no damping, no driving.',
+    '',
+    "m x1'' = -k x1 - kc(x1 - x2)",
+    "m x2'' = -k x2 - kc(x2 - x1)",
+    '',
+    'Use normal coordinates:',
+    'q+ = (x1 + x2) / 2',
+    'q- = (x1 - x2) / 2',
+    '',
+    'The equations separate:',
+    "q+'' + (k/m) q+ = 0",
+    "q-'' + ((k + 2kc)/m) q- = 0",
+    '',
+    `omega_in = ${omegaIn.toFixed(3)}`,
+    `omega_out = ${omegaOut.toFixed(3)}`,
+    '',
+    `x1(0) = ${input.x1.toFixed(3)}, x2(0) = ${input.x2.toFixed(3)}`,
+    `v1(0) = ${input.v1.toFixed(3)}, v2(0) = ${input.v2.toFixed(3)}`,
+    '',
+    'Convert back:',
+    'x1 = q+ + q-',
+    'x2 = q+ - q-',
+  ].join('\n');
+}
+
 function formatNumber(value) {
   return Number.isFinite(value) ? value.toFixed(3) : 'infinite';
 }
@@ -522,6 +649,7 @@ function applySolution(payload) {
   setWarning(payload.warning || '');
   setDampingPresetState(payload.caseId || '');
   setDrivePresetState();
+  setCoupledPresetState();
   simTime = 0;
   lastFrame = performance.now();
 }
@@ -530,7 +658,7 @@ function prepareSolution(payload) {
   const points = payload.points || [];
   return {
     ...payload,
-    maxAbsX: Math.max(1, ...points.map((p) => Math.abs(p.x))),
+    maxAbsX: Math.max(1, ...points.flatMap((p) => [Math.abs(p.x), Math.abs(p.x1 || 0), Math.abs(p.x2 || 0)])),
     plotPathCache: null,
     responsePathCache: null,
   };
@@ -540,6 +668,7 @@ function setWarning(message) {
   ui.boundaryWarning.textContent = activeSimulation === 'day01_boundary_value' ? message : '';
   ui.dampingWarning.textContent = activeSimulation === 'day02_damping' ? message : '';
   ui.drivenWarning.textContent = activeSimulation === 'day03_driven' ? message : '';
+  ui.coupledWarning.textContent = activeSimulation === 'day04_coupled' ? message : '';
 }
 
 function setDampingPreset(kind) {
@@ -593,6 +722,28 @@ function setDrivePresetState() {
   ui.aboveDrive.classList.toggle('active', Math.abs(driveOmega - omega0 * 1.35) < 0.03);
 }
 
+function setCoupledPreset(kind) {
+  const values = {
+    in: [1, 1, 0, 0],
+    out: [1, -1, 0, 0],
+    beat: [1, 0, 0, 0],
+  }[kind];
+  [controls.coupled.x1.value, controls.coupled.x2.value, controls.coupled.v1.value, controls.coupled.v2.value] = values;
+  scheduleSolve(0);
+}
+
+function setCoupledPresetState() {
+  const isCoupled = activeSimulation === 'day04_coupled';
+  const x1 = inputNumber('coupled', 'x1');
+  const x2 = inputNumber('coupled', 'x2');
+  const v1 = inputNumber('coupled', 'v1');
+  const v2 = inputNumber('coupled', 'v2');
+  const rest = Math.abs(v1) < 0.01 && Math.abs(v2) < 0.01;
+  ui.inPhaseCoupled.classList.toggle('active', isCoupled && rest && Math.abs(x1 - 1) < 0.01 && Math.abs(x2 - 1) < 0.01);
+  ui.outPhaseCoupled.classList.toggle('active', isCoupled && rest && Math.abs(x1 - 1) < 0.01 && Math.abs(x2 + 1) < 0.01);
+  ui.beatCoupled.classList.toggle('active', isCoupled && rest && Math.abs(x1 - 1) < 0.01 && Math.abs(x2) < 0.01);
+}
+
 function setActiveSimulation(simulationId) {
   if (!SIMS[simulationId]) return;
   activeSimulation = simulationId;
@@ -604,6 +755,7 @@ function setActiveSimulation(simulationId) {
   ui.boundaryControls.classList.toggle('is-hidden', simulationId !== 'day01_boundary_value');
   ui.dampingControls.classList.toggle('is-hidden', simulationId !== 'day02_damping');
   ui.drivenControls.classList.toggle('is-hidden', simulationId !== 'day03_driven');
+  ui.coupledControls.classList.toggle('is-hidden', simulationId !== 'day04_coupled');
   ui.dayTabs.forEach((button) => {
     const isActive = button.dataset.sim === simulationId;
     button.classList.toggle('active', isActive);
@@ -614,6 +766,7 @@ function setActiveSimulation(simulationId) {
   setWarning('');
   setDampingPresetState('');
   setDrivePresetState();
+  setCoupledPresetState();
   scheduleSolve(0);
 }
 
@@ -668,7 +821,7 @@ function pointAt(time) {
 }
 
 function interpolatePoint(a, b, mix) {
-  return {
+  const point = {
     t: a.t + (b.t - a.t) * mix,
     x: a.x + (b.x - a.x) * mix,
     v: a.v + (b.v - a.v) * mix,
@@ -676,6 +829,12 @@ function interpolatePoint(a, b, mix) {
     force: a.force + (b.force - a.force) * mix,
     drive: (a.drive || 0) + ((b.drive || 0) - (a.drive || 0)) * mix,
   };
+  ['x1', 'x2', 'v1', 'v2', 'a1', 'a2', 'force1', 'force2', 'qPlus', 'qMinus'].forEach((key) => {
+    if (a[key] != null || b[key] != null) {
+      point[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * mix;
+    }
+  });
+  return point;
 }
 
 function simulationColor() {
@@ -683,6 +842,7 @@ function simulationColor() {
     day01_boundary_value: '#d1242f',
     day02_damping: '#bf8700',
     day03_driven: '#1f883d',
+    day04_coupled: '#0969da',
   }[activeSimulation] || '#0969da';
 }
 
@@ -729,6 +889,53 @@ function drawMassSpring(rect, cur) {
   drawText(`x=${cur.x.toFixed(3)} v=${cur.v.toFixed(3)} a=${cur.a.toFixed(3)} F=${cur.force.toFixed(3)}`, 24, 52);
 }
 
+function drawCoupledMassSpring(rect, cur) {
+  const y = rect.height * 0.34;
+  const leftWall = 58;
+  const rightWall = rect.width - 58;
+  const origin1 = rect.width * 0.38;
+  const origin2 = rect.width * 0.62;
+  const scale = Math.min(78, rect.width / (solution.maxAbsX * 8));
+  const mass1X = origin1 + cur.x1 * scale;
+  const mass2X = origin2 + cur.x2 * scale;
+
+  ctx.fillStyle = '#eaeef2';
+  ctx.fillRect(leftWall - 16, y - 70, 20, 140);
+  ctx.fillRect(rightWall - 4, y - 70, 20, 140);
+  ctx.fillStyle = '#24292f';
+  ctx.fillRect(leftWall - 4, y - 70, 4, 140);
+  ctx.fillRect(rightWall, y - 70, 4, 140);
+
+  drawSpring(leftWall, y, mass1X - 28);
+  drawSpring(mass1X + 28, y, mass2X - 28);
+  drawSpring(mass2X + 28, y, rightWall);
+
+  drawEquilibriumTick(origin1, y, '#0969da');
+  drawEquilibriumTick(origin2, y, '#8250df');
+  drawBlock(mass1X, y, '#0969da');
+  drawBlock(mass2X, y, '#8250df');
+
+  drawText(solution.simulation?.title || 'coupled oscillators', 24, 30);
+  drawText(`x1=${cur.x1.toFixed(3)} x2=${cur.x2.toFixed(3)}`, 24, 52);
+  drawText(`omega_in=${solution.omegaIn.toFixed(3)} omega_out=${solution.omegaOut.toFixed(3)}`, 24, 74);
+}
+
+function drawBlock(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#24292f';
+  ctx.lineWidth = 1;
+  ctx.fillRect(x - 28, y - 24, 56, 48);
+  ctx.strokeRect(x - 28, y - 24, 56, 48);
+}
+
+function drawEquilibriumTick(x, y, color) {
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y + 38);
+  ctx.lineTo(x, y + 68);
+  ctx.stroke();
+}
+
 function drawDriveArrow(massX, y, cur) {
   const driveForce = solution.input?.driveForce ?? 1;
   if (driveForce === 0) return;
@@ -754,6 +961,10 @@ function drawDriveArrow(massX, y, cur) {
 
 function drawPositionGraph(rect) {
   if (!solution?.points?.length) return;
+  if (activeSimulation === 'day04_coupled') {
+    drawCoupledPositionGraph(rect);
+    return;
+  }
   const gx = 52;
   const gy = rect.height - 155;
   const gw = rect.width - 104;
@@ -786,6 +997,42 @@ function drawPositionGraph(rect) {
   ctx.lineTo(markerX, gy + gh);
   ctx.stroke();
   drawText('x(t)', gx, gy - 8);
+}
+
+function drawCoupledPositionGraph(rect) {
+  const gx = 52;
+  const gy = rect.height - 155;
+  const gw = rect.width - 104;
+  const gh = 95;
+  const maxAbs = solution.maxAbsX;
+  ctx.strokeStyle = '#d0d7de';
+  ctx.strokeRect(gx, gy, gw, gh);
+  ctx.beginPath();
+  ctx.moveTo(gx, gy + gh / 2);
+  ctx.lineTo(gx + gw, gy + gh / 2);
+  ctx.stroke();
+  drawCoupledGraphLine(gx, gy, gw, gh, maxAbs, 'x1', '#0969da');
+  drawCoupledGraphLine(gx, gy, gw, gh, maxAbs, 'x2', '#8250df');
+  const markerX = gx + (currentPlotTime() / solution.duration) * gw;
+  ctx.strokeStyle = '#d1242f';
+  ctx.beginPath();
+  ctx.moveTo(markerX, gy);
+  ctx.lineTo(markerX, gy + gh);
+  ctx.stroke();
+  drawText('x1(t)', gx, gy - 8, '#0969da');
+  drawText('x2(t)', gx + 54, gy - 8, '#8250df');
+}
+
+function drawCoupledGraphLine(gx, gy, gw, gh, maxAbs, key, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  solution.points.forEach((p, i) => {
+    const px = gx + (p.t / solution.duration) * gw;
+    const py = gy + gh / 2 - (p[key] / maxAbs) * (gh * 0.42);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  });
+  ctx.stroke();
 }
 
 function drawResponseGraph(rect) {
@@ -914,6 +1161,9 @@ ui.strongDamping.addEventListener('click', () => setDampingPreset('strong'));
 ui.belowDrive.addEventListener('click', () => setDrivePreset('below'));
 ui.resonanceDrive.addEventListener('click', () => setDrivePreset('resonance'));
 ui.aboveDrive.addEventListener('click', () => setDrivePreset('above'));
+ui.inPhaseCoupled.addEventListener('click', () => setCoupledPreset('in'));
+ui.outPhaseCoupled.addEventListener('click', () => setCoupledPreset('out'));
+ui.beatCoupled.addEventListener('click', () => setCoupledPreset('beat'));
 ui.pausePlayback.addEventListener('click', () => setPlayback('pause'));
 ui.slowPlayback.addEventListener('click', () => setPlayback('slow'));
 ui.normalPlayback.addEventListener('click', () => setPlayback('normal'));
@@ -937,7 +1187,8 @@ scheduleSolve(0);
     return;
   }
   const cur = pointAt(simTime);
-  if (cur) drawMassSpring(rect, cur);
+  if (cur && activeSimulation === 'day04_coupled') drawCoupledMassSpring(rect, cur);
+  if (cur && activeSimulation !== 'day04_coupled') drawMassSpring(rect, cur);
   drawResponseGraph(rect);
   drawPositionGraph(rect);
   drawTargetMarker(rect);

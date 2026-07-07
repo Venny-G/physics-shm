@@ -1,5 +1,6 @@
 ### UPDATE 7/3 - DAY 2 IS COMPLETE
 ### UPDATE 7/5 - DAY 3 IS COMPLETE
+### UPDATE 7/7 - DAY 4 IS COMPLETE
 
 
 # Harmonic Oscillators - Ven's Notes
@@ -39,6 +40,9 @@ days/
   day03_driven/
     model.py
     notes.md
+  day04_coupled/
+    model.py
+    notes.md
 ```
 
 - `index.html`, `styles.css`, `script.js`: the current webpage
@@ -47,6 +51,7 @@ days/
 - `days/day01_boundary_value/`: Day 1 notes, images, and working solver
 - `days/day02_damping/`: Day 2 notes and working damping solver
 - `days/day03_driven/`: Day 3 notes and working driven oscillator solver
+- `days/day04_coupled/`: Day 4 notes and working coupled oscillator solver
 - `.github/`: GitHub Pages and automation files
 
 ## Run Locally
@@ -73,6 +78,6 @@ npm run check
 The check runs:
 
 ```bash
-python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py days/day03_driven/model.py
+python3 -m py_compile server.py days/registry.py days/day01_boundary_value/model.py days/day02_damping/model.py days/day03_driven/model.py days/day04_coupled/model.py
 node --check script.js
 ```
