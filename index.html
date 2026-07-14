@@ -6,7 +6,7 @@
     <title>Ven's Notes: Vibrations and Waves Simulation + Notes</title>
     <link rel="icon" type="image/png" sizes="225x225" href="assets/site-icon.png?v=1" />
     <link rel="apple-touch-icon" href="assets/site-icon.png?v=1" />
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <main class="shell">
@@ -24,6 +24,7 @@
           <button class="ghost" type="button" data-sim="day02_damping">Day 2: Damping</button>
           <button class="ghost" type="button" data-sim="day03_driven">Day 3: Driven</button>
           <button class="ghost" type="button" data-sim="day04_coupled">Day 4: Coupled</button>
+          <button class="ghost" type="button" data-sim="day05_traveling">Day 5: Traveling Waves</button>
         </nav>
 
         <section class="controls" aria-label="Simulation controls">
@@ -87,6 +88,25 @@
               <button id="beatCoupled" type="button">Beat</button>
             </div>
             <p id="coupledWarning" class="warning"></p>
+          </section>
+
+          <section class="control-block compact-controls is-hidden" id="travelingControls">
+            <h2>Traveling wave: shape a disturbance on an ideal string</h2>
+            <label>Tension, T<input id="wTension" type="number" min="0.1" max="40" step="0.1" value="4" /></label>
+            <label>Linear density, mu<input id="wDensity" type="number" min="0.02" max="5" step="0.01" value="0.25" /></label>
+            <label>Amplitude, A<input id="wAmplitude" type="number" min="0" max="2.5" step="0.05" value="0.8" /></label>
+            <label>Wavelength<input id="wWavelength" type="number" min="0.5" max="12" step="0.1" value="4" /></label>
+            <label>Phase<input id="wPhase" type="number" min="-6.28" max="6.28" step="0.1" value="0" /></label>
+            <label>Wave shape<select id="wWaveform"><option value="sinusoid">Sinusoid</option><option value="pulse">Pulse</option></select></label>
+            <label>Direction<select id="wDirection"><option value="1">Right</option><option value="-1">Left</option></select></label>
+            <label>String length<input id="wLength" type="number" min="4" max="30" step="0.5" value="12" /></label>
+            <label>Duration<input id="wDuration" type="number" min="1" max="20" step="0.25" value="6" /></label>
+            <div class="button-row traveling-presets" role="group" aria-label="Traveling wave presets">
+              <button id="rightWave" type="button">Right wave</button>
+              <button id="leftWave" type="button">Left wave</button>
+              <button id="pulseWave" type="button">Pulse</button>
+            </div>
+            <p id="travelingWarning" class="warning"></p>
           </section>
 
           <section class="control-block">
@@ -367,9 +387,54 @@ When both modes are present, the motion can look like energy moving back and for
 between the masses. That is the beat case.</pre>
           </details>
         </section>
+
+        <section class="lecture-sheet is-hidden" data-note="day05_traveling" aria-label="Day 5 notes">
+          <div class="note-title">
+            <p class="scribble">day 5 / traveling waves without damping</p>
+            <h2>The string moves transversely while the disturbance carries energy along it.</h2>
+          </div>
+          <details class="math-dropdown" open>
+            <summary>Show traveling-wave math</summary>
+            <pre class="plain-note">Traveling waves without damping
+
+Think of a taut string as infinitely many tiny identical oscillators, each coupled
+to its neighbors. In the continuous limit its transverse displacement obeys:
+
+d2y/dt2 = c^2 d2y/dx2
+
+For a string under tension T with linear mass density mu:
+
+c = sqrt(T / mu)
+
+The general traveling-wave solution is:
+
+y(x,t) = f(x - ct) + g(x + ct)
+
+f(x - ct) moves right without changing shape.
+g(x + ct) moves left without changing shape.
+
+For a sinusoidal wave:
+
+y(x,t) = A cos(kx - omega t + phi)     right-moving
+y(x,t) = A cos(kx + omega t + phi)     left-moving
+
+k = 2pi / lambda
+omega = ck
+c = omega / k = lambda f
+
+Important physical distinction:
+
+Each small part of the string moves up and down.
+The wave profile and energy move horizontally.
+The string material does not travel along with the wave.
+
+A pulse works the same way: replace the cosine with any shape f. Without
+damping or dispersion, that shape is simply translated by distance ct.</pre>
+          </details>
+        </section>
       </section>
     </main>
 
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=9"></script>
   </body>
 </html>

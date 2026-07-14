@@ -9,10 +9,12 @@ const ui = {
   dampingWarning: qs('#dampingWarning'),
   drivenWarning: qs('#drivenWarning'),
   coupledWarning: qs('#coupledWarning'),
+  travelingWarning: qs('#travelingWarning'),
   boundaryControls: qs('#boundaryControls'),
   dampingControls: qs('#dampingControls'),
   drivenControls: qs('#drivenControls'),
   coupledControls: qs('#coupledControls'),
+  travelingControls: qs('#travelingControls'),
   pausePlayback: qs('#pausePlayback'),
   slowPlayback: qs('#slowPlayback'),
   normalPlayback: qs('#normalPlayback'),
@@ -26,6 +28,9 @@ const ui = {
   inPhaseCoupled: qs('#inPhaseCoupled'),
   outPhaseCoupled: qs('#outPhaseCoupled'),
   beatCoupled: qs('#beatCoupled'),
+  rightWave: qs('#rightWave'),
+  leftWave: qs('#leftWave'),
+  pulseWave: qs('#pulseWave'),
   dayTabs: qsa('.day-tabs button'),
   noteSheets: qsa('[data-note]'),
 };
@@ -66,6 +71,17 @@ const controls = {
     v2: qs('#cv2'),
     duration: qs('#cDuration'),
   },
+  traveling: {
+    tension: qs('#wTension'),
+    linearDensity: qs('#wDensity'),
+    amplitude: qs('#wAmplitude'),
+    wavelength: qs('#wWavelength'),
+    phase: qs('#wPhase'),
+    waveform: qs('#wWaveform'),
+    direction: qs('#wDirection'),
+    length: qs('#wLength'),
+    duration: qs('#wDuration'),
+  },
 };
 
 const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:5173' : '';
@@ -89,6 +105,11 @@ const SIMS = {
     controls: 'coupled',
     warning: ui.coupledWarning,
     fallback: solveCoupledInBrowser,
+  },
+  day05_traveling: {
+    controls: 'traveling',
+    warning: ui.travelingWarning,
+    fallback: solveTravelingInBrowser,
   },
 };
 
@@ -173,10 +194,26 @@ function coupledParams() {
   });
 }
 
+function travelingParams() {
+  return new URLSearchParams({
+    sim: 'day05_traveling',
+    tension: inputNumber('traveling', 'tension'),
+    mu: inputNumber('traveling', 'linearDensity'),
+    amplitude: inputNumber('traveling', 'amplitude'),
+    wavelength: inputNumber('traveling', 'wavelength'),
+    phase: inputNumber('traveling', 'phase'),
+    waveform: controls.traveling.waveform.value,
+    direction: controls.traveling.direction.value,
+    length: inputNumber('traveling', 'length'),
+    duration: inputNumber('traveling', 'duration'),
+  });
+}
+
 function paramsForActiveSimulation() {
   if (activeSimulation === 'day02_damping') return dampingParams();
   if (activeSimulation === 'day03_driven') return drivenParams();
   if (activeSimulation === 'day04_coupled') return coupledParams();
+  if (activeSimulation === 'day05_traveling') return travelingParams();
   return boundaryParams();
 }
 
@@ -352,6 +389,78 @@ function solveCoupledInBrowser(params) {
     points,
     equationText: coupledEquationText(input, omegaIn, omegaOut, 'Browser fallback solve:'),
   };
+}
+
+function solveTravelingInBrowser(params) {
+  const tension = Number(params.get('tension') || 4);
+  const linearDensity = Number(params.get('mu') || 0.25);
+  const amplitude = Number(params.get('amplitude') || 0.8);
+  const wavelength = Number(params.get('wavelength') || 4);
+  const phase = Number(params.get('phase') || 0);
+  const direction = Number(params.get('direction') || 1) >= 0 ? 1 : -1;
+  const waveform = params.get('waveform') || 'sinusoid';
+  const length = Number(params.get('length') || 12);
+  const duration = Number(params.get('duration') || 6);
+  if (tension <= 0 || linearDensity <= 0 || wavelength <= 0 || length <= 0 || duration <= 0) {
+    throw new Error('tension, density, wavelength, length, and duration must be positive.');
+  }
+  if (!['sinusoid', 'pulse'].includes(waveform)) throw new Error('waveform must be sinusoid or pulse.');
+
+  const speed = Math.sqrt(tension / linearDensity);
+  const waveNumber = 2 * Math.PI / wavelength;
+  const omega = speed * waveNumber;
+  const probeX = length / 2;
+  const xValues = Array.from({ length: 181 }, (_, i) => (length * i) / 180);
+  const input = { tension, linearDensity, amplitude, wavelength, phase, direction, waveform, length, duration };
+  const points = samplePoints(duration, (t) => {
+    const yValues = xValues.map((x) => travelingDisplacement(x, t, input, speed, waveNumber));
+    const x = travelingDisplacement(probeX, t, input, speed, waveNumber);
+    const v = travelingVelocity(probeX, t, input, speed, waveNumber);
+    const a = waveform === 'sinusoid' ? -(omega ** 2) * x : 0;
+    return { t, x, v, a, force: 0, yValues };
+  }, 360);
+
+  return {
+    simulation: { id: 'day05_traveling', day: 5, title: 'Traveling waves' },
+    input,
+    speed,
+    waveNumber,
+    omega,
+    probeX,
+    xValues,
+    duration,
+    loop: true,
+    warning: '',
+    points,
+    equationText: travelingEquationText(input, speed, waveNumber, omega, 'Browser fallback solve:'),
+  };
+}
+
+function wrappedCoordinate(value, length) {
+  return ((value + length / 2) % length + length) % length - length / 2;
+}
+
+function travelingDisplacement(x, t, input, speed, waveNumber) {
+  const travelingX = x - input.direction * speed * t;
+  if (input.waveform === 'pulse') {
+    const center = input.length * 0.25;
+    const width = input.wavelength / 3;
+    const distance = wrappedCoordinate(travelingX - center, input.length);
+    return input.amplitude * Math.exp(-((distance / width) ** 2));
+  }
+  return input.amplitude * Math.cos(waveNumber * travelingX + input.phase);
+}
+
+function travelingVelocity(x, t, input, speed, waveNumber) {
+  const travelingX = x - input.direction * speed * t;
+  if (input.waveform === 'pulse') {
+    const center = input.length * 0.25;
+    const width = input.wavelength / 3;
+    const distance = wrappedCoordinate(travelingX - center, input.length);
+    const y = input.amplitude * Math.exp(-((distance / width) ** 2));
+    return input.direction * speed * (2 * distance / (width ** 2)) * y;
+  }
+  return input.direction * input.amplitude * speed * waveNumber * Math.sin(waveNumber * travelingX + input.phase);
 }
 
 function coupledStateAt(t, input, omegaIn, omegaOut) {
@@ -609,6 +718,28 @@ function coupledEquationText(input, omegaIn, omegaOut, heading) {
   ].join('\n');
 }
 
+function travelingEquationText(input, speed, waveNumber, omega, heading) {
+  const directionText = input.direction > 0 ? 'right' : 'left';
+  const shape = input.direction > 0 ? 'f(x - ct)' : 'g(x + ct)';
+  const lines = [
+    heading,
+    'Ideal taut string, no damping.',
+    '',
+    'd2y/dt2 = c^2 d2y/dx2',
+    `c = sqrt(T/mu) = ${speed.toFixed(3)}`,
+    '',
+    `This shape moves ${directionText}:`,
+    `y(x,t) = ${shape}`,
+  ];
+  if (input.waveform === 'sinusoid') {
+    lines.push('', 'y(x,t) = A cos(k(x -/+ ct) + phi)', `k = 2pi/lambda = ${waveNumber.toFixed(3)}`, `omega = ck = ${omega.toFixed(3)}`);
+  } else {
+    lines.push('', 'The Gaussian pulse keeps its shape as it travels.', 'Periodic wrapping represents a long repeating string.');
+  }
+  lines.push('', 'String points move up and down.', 'The wave pattern and energy move along the string.');
+  return lines.join('\n');
+}
+
 function formatNumber(value) {
   return Number.isFinite(value) ? value.toFixed(3) : 'infinite';
 }
@@ -650,6 +781,7 @@ function applySolution(payload) {
   setDampingPresetState(payload.caseId || '');
   setDrivePresetState();
   setCoupledPresetState();
+  setTravelingPresetState();
   simTime = 0;
   lastFrame = performance.now();
 }
@@ -669,6 +801,7 @@ function setWarning(message) {
   ui.dampingWarning.textContent = activeSimulation === 'day02_damping' ? message : '';
   ui.drivenWarning.textContent = activeSimulation === 'day03_driven' ? message : '';
   ui.coupledWarning.textContent = activeSimulation === 'day04_coupled' ? message : '';
+  ui.travelingWarning.textContent = activeSimulation === 'day05_traveling' ? message : '';
 }
 
 function setDampingPreset(kind) {
@@ -744,6 +877,26 @@ function setCoupledPresetState() {
   ui.beatCoupled.classList.toggle('active', isCoupled && rest && Math.abs(x1 - 1) < 0.01 && Math.abs(x2) < 0.01);
 }
 
+function setTravelingPreset(kind) {
+  if (kind === 'pulse') {
+    controls.traveling.waveform.value = 'pulse';
+    controls.traveling.direction.value = '1';
+  } else {
+    controls.traveling.waveform.value = 'sinusoid';
+    controls.traveling.direction.value = kind === 'left' ? '-1' : '1';
+  }
+  scheduleSolve(0);
+}
+
+function setTravelingPresetState() {
+  const isTraveling = activeSimulation === 'day05_traveling';
+  const waveform = controls.traveling.waveform.value;
+  const direction = Number(controls.traveling.direction.value);
+  ui.rightWave.classList.toggle('active', isTraveling && waveform === 'sinusoid' && direction > 0);
+  ui.leftWave.classList.toggle('active', isTraveling && waveform === 'sinusoid' && direction < 0);
+  ui.pulseWave.classList.toggle('active', isTraveling && waveform === 'pulse');
+}
+
 function setActiveSimulation(simulationId) {
   if (!SIMS[simulationId]) return;
   activeSimulation = simulationId;
@@ -756,6 +909,7 @@ function setActiveSimulation(simulationId) {
   ui.dampingControls.classList.toggle('is-hidden', simulationId !== 'day02_damping');
   ui.drivenControls.classList.toggle('is-hidden', simulationId !== 'day03_driven');
   ui.coupledControls.classList.toggle('is-hidden', simulationId !== 'day04_coupled');
+  ui.travelingControls.classList.toggle('is-hidden', simulationId !== 'day05_traveling');
   ui.dayTabs.forEach((button) => {
     const isActive = button.dataset.sim === simulationId;
     button.classList.toggle('active', isActive);
@@ -767,6 +921,7 @@ function setActiveSimulation(simulationId) {
   setDampingPresetState('');
   setDrivePresetState();
   setCoupledPresetState();
+  setTravelingPresetState();
   scheduleSolve(0);
 }
 
@@ -834,6 +989,9 @@ function interpolatePoint(a, b, mix) {
       point[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * mix;
     }
   });
+  if (a.yValues && b.yValues) {
+    point.yValues = a.yValues.map((value, index) => value + (b.yValues[index] - value) * mix);
+  }
   return point;
 }
 
@@ -843,6 +1001,7 @@ function simulationColor() {
     day02_damping: '#bf8700',
     day03_driven: '#1f883d',
     day04_coupled: '#0969da',
+    day05_traveling: '#8250df',
   }[activeSimulation] || '#0969da';
 }
 
@@ -918,6 +1077,66 @@ function drawCoupledMassSpring(rect, cur) {
   drawText(solution.simulation?.title || 'coupled oscillators', 24, 30);
   drawText(`x1=${cur.x1.toFixed(3)} x2=${cur.x2.toFixed(3)}`, 24, 52);
   drawText(`omega_in=${solution.omegaIn.toFixed(3)} omega_out=${solution.omegaOut.toFixed(3)}`, 24, 74);
+}
+
+function drawTravelingWave(rect, cur) {
+  if (!cur.yValues?.length || !solution.xValues?.length) return;
+  const left = 54;
+  const right = rect.width - 54;
+  const centerY = rect.height * 0.34;
+  const width = right - left;
+  const amplitudeScale = Math.min(105, rect.height * 0.22) / Math.max(0.1, solution.input?.amplitude || 1);
+
+  ctx.strokeStyle = '#d0d7de';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(left, centerY);
+  ctx.lineTo(right, centerY);
+  ctx.stroke();
+
+  ctx.strokeStyle = simulationColor();
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  cur.yValues.forEach((y, index) => {
+    const x = left + (solution.xValues[index] / solution.input.length) * width;
+    const canvasY = centerY - y * amplitudeScale;
+    index ? ctx.lineTo(x, canvasY) : ctx.moveTo(x, canvasY);
+  });
+  ctx.stroke();
+
+  const probeX = left + (solution.probeX / solution.input.length) * width;
+  ctx.strokeStyle = '#d1242f';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(probeX, centerY - 125);
+  ctx.lineTo(probeX, centerY + 125);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#d1242f';
+  ctx.beginPath();
+  ctx.arc(probeX, centerY - cur.x * amplitudeScale, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  const arrowDirection = solution.input.direction > 0 ? 1 : -1;
+  const arrowStart = rect.width * 0.5 - arrowDirection * 34;
+  const arrowEnd = arrowStart + arrowDirection * 68;
+  ctx.strokeStyle = '#1f883d';
+  ctx.fillStyle = '#1f883d';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(arrowStart, centerY - 145);
+  ctx.lineTo(arrowEnd, centerY - 145);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(arrowEnd, centerY - 145);
+  ctx.lineTo(arrowEnd - arrowDirection * 9, centerY - 151);
+  ctx.lineTo(arrowEnd - arrowDirection * 9, centerY - 139);
+  ctx.closePath();
+  ctx.fill();
+
+  drawText(solution.simulation?.title || 'traveling wave', 24, 30);
+  drawText(`c=${solution.speed.toFixed(3)}  k=${solution.waveNumber.toFixed(3)}  omega=${solution.omega.toFixed(3)}`, 24, 52);
+  drawText(`probe x=${solution.probeX.toFixed(2)}  y=${cur.x.toFixed(3)}`, 24, 74, '#d1242f');
 }
 
 function drawBlock(x, y, color) {
@@ -996,7 +1215,7 @@ function drawPositionGraph(rect) {
   ctx.moveTo(markerX, gy);
   ctx.lineTo(markerX, gy + gh);
   ctx.stroke();
-  drawText('x(t)', gx, gy - 8);
+  drawText(activeSimulation === 'day05_traveling' ? 'y(probe, t)' : 'x(t)', gx, gy - 8);
 }
 
 function drawCoupledPositionGraph(rect) {
@@ -1164,6 +1383,9 @@ ui.aboveDrive.addEventListener('click', () => setDrivePreset('above'));
 ui.inPhaseCoupled.addEventListener('click', () => setCoupledPreset('in'));
 ui.outPhaseCoupled.addEventListener('click', () => setCoupledPreset('out'));
 ui.beatCoupled.addEventListener('click', () => setCoupledPreset('beat'));
+ui.rightWave.addEventListener('click', () => setTravelingPreset('right'));
+ui.leftWave.addEventListener('click', () => setTravelingPreset('left'));
+ui.pulseWave.addEventListener('click', () => setTravelingPreset('pulse'));
 ui.pausePlayback.addEventListener('click', () => setPlayback('pause'));
 ui.slowPlayback.addEventListener('click', () => setPlayback('slow'));
 ui.normalPlayback.addEventListener('click', () => setPlayback('normal'));
@@ -1188,7 +1410,8 @@ scheduleSolve(0);
   }
   const cur = pointAt(simTime);
   if (cur && activeSimulation === 'day04_coupled') drawCoupledMassSpring(rect, cur);
-  if (cur && activeSimulation !== 'day04_coupled') drawMassSpring(rect, cur);
+  if (cur && activeSimulation === 'day05_traveling') drawTravelingWave(rect, cur);
+  if (cur && !['day04_coupled', 'day05_traveling'].includes(activeSimulation)) drawMassSpring(rect, cur);
   drawResponseGraph(rect);
   drawPositionGraph(rect);
   drawTargetMarker(rect);

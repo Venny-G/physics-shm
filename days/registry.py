@@ -4,6 +4,7 @@ from days.day01_boundary_value import model as day01_boundary_value
 from days.day02_damping import model as day02_damping
 from days.day03_driven import model as day03_driven
 from days.day04_coupled import model as day04_coupled
+from days.day05_traveling import model as day05_traveling
 
 
 MODULES = [
@@ -11,6 +12,7 @@ MODULES = [
     day02_damping,
     day03_driven,
     day04_coupled,
+    day05_traveling,
 ]
 
 SIMULATIONS = {module.SIMULATION["id"]: module for module in MODULES}
