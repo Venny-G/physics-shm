@@ -20,45 +20,6 @@ https://venny-g.github.io/physics-shm/
 The web version keeps a browser fallback for Day 1 so it can run on GitHub
 Pages. The local version uses Python simulation modules from `days/`.
 
-## Repo Layout
-
-```text
-index.html
-styles.css
-script.js
-server.py
-package.json
-assets/
-days/
-  registry.py
-  day01_boundary_value/
-    model.py
-    notes.md
-    images/
-  day02_damping/
-    model.py
-    notes.md
-  day03_driven/
-    model.py
-    notes.md
-  day04_coupled/
-    model.py
-    notes.md
-  day05_traveling/
-    model.py
-    notes.md
-```
-
-- `index.html`, `styles.css`, `script.js`: the current webpage
-- `server.py`: local static server plus JSON API routes
-- `days/registry.py`: imports runnable day modules for the API
-- `days/day01_boundary_value/`: Day 1 notes, images, and working solver
-- `days/day02_damping/`: Day 2 notes and working damping solver
-- `days/day03_driven/`: Day 3 notes and working driven oscillator solver
-- `days/day04_coupled/`: Day 4 notes and working coupled oscillator solver
-- `days/day05_traveling/`: Day 5 notes and working traveling-wave solver
-- `.github/`: GitHub Pages and automation files
-
 ## Run Locally
 
 ```bash
